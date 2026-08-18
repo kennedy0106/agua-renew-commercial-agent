@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#052a47" />
+    <title>Agua ReNew | Simulador comercial</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#conversation">Ir a la conversación</a>
+    <div class="page-grain" aria-hidden="true"></div>
+    <main class="shell" id="main">
+      <aside class="identity-panel" aria-label="Información del simulador">
+        <img class="renew-mark" src="/assets/logo_color.webp" alt="Agua ReNew — Logo" width="200" height="60" />
+        <div class="panel-divider" aria-hidden="true"></div>
+        <p class="eyebrow">Simulador local</p>
+        <h1>Consulta<br /><span>comercial</span></h1>
+        <p class="intro">Respuestas comerciales respaldadas por la información documentada de Agua ReNew.</p>
+        <div class="mode-card">
+          <span class="status-dot" aria-hidden="true"></span>
+          <div>
+            <strong id="mode-label">Modo determinístico</strong>
+            <small id="mode-detail">Sin IA · Sin WhatsApp · Sin n8n</small>
+          </div>
+        </div>
+        <dl class="guardrails">
+          <div><dt>Fuente</dt><dd>Datos comerciales estructurados</dd></div>
+          <div><dt>Bloqueos</dt><dd>Derivación humana obligatoria</dd></div>
+          <div><dt>Canal</dt><dd>Simulador web local</dd></div>
+        </dl>
+      </aside>
+
+      <section class="chat-panel" aria-labelledby="chat-title">
+        <header class="chat-header">
+          <div>
+            <p class="eyebrow">Sesión de prueba</p>
+            <h2 id="chat-title">Asistente comercial</h2>
+          </div>
+          <div class="header-actions">
+            <button class="new-button" id="new-conversation" type="button">＋ Nueva prueba</button>
+            <button class="restart-button" id="restart" type="button">↻ Reiniciar actual</button>
+          </div>
+        </header>
+
+        <div class="status-line" aria-live="polite">
+          <span class="pulse" aria-hidden="true"></span>
+          <span id="conversation-status">Preparando conversación</span>
+        </div>
+
+        <section class="messages" id="conversation" aria-live="polite" aria-label="Mensajes de la conversación"></section>
+
+        <form class="composer" id="composer">
+          <label class="sr-only" for="message-input">Escribe una respuesta</label>
+          <input id="message-input" name="message" autocomplete="off" placeholder="Escribe una cantidad u opción…" />
+          <button class="send-button" type="submit">Enviar <span aria-hidden="true">↗</span></button>
+        </form>
+      </section>
+    </main>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

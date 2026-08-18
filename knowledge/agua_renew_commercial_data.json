@@ -1,0 +1,350 @@
+{
+  "schema_version": "1.0",
+  "title": "Agua ReNew — datos comerciales documentados",
+  "language": "es-PE",
+  "source_of_truth": {
+    "rule": "Este archivo solo normaliza información extraída de los documentos fuente; no añade condiciones comerciales.",
+    "documents": [
+      {
+        "id": "speech_maquila",
+        "file": "Speech maquila (1).docx"
+      },
+      {
+        "id": "precios_agua_renew",
+        "file": "PRECIOS AGUA RENEW (1).docx"
+      }
+    ]
+  },
+  "response_policy": {
+    "supported_only": true,
+    "when_missing_or_ambiguous": "Indicar que la información debe confirmarse con un asesor y ofrecer derivación humana.",
+    "do_not_infer": [
+      "precios", "promociones", "disponibilidad", "costo de delivery", "tiempos de entrega", "requisitos", "alcance de productos"
+    ]
+  },
+  "commercial_modalities": {
+    "maquila": {
+      "name": "Servicio de maquila / marca propia",
+      "documented_description": "El cliente comercializa con su propia marca. Agua ReNew fabrica y envasa; el cliente establece su precio de venta y desarrolla su cartera de clientes.",
+      "labeling": "La etiqueta se personaliza con la marca del cliente y su empresa figura como \"Distribuido por\".",
+      "sanitary_backing": "Los productos se fabrican y envasan bajo el Registro Sanitario de MANANTIAL DE VIDA PERÚ E.I.R.L.",
+      "source": "speech_maquila: Diferencias marca propia y Agua ReNew; Servicio de Maquila Premium"
+    },
+    "distribution_agua_renew": {
+      "name": "Distribución con la marca Agua ReNew",
+      "documented_description": "El distribuidor compra producto terminado de Agua ReNew para revenderlo. No requiere diseño ni impresión de etiquetas personalizadas.",
+      "source": "speech_maquila: Diferencias marca propia y Agua ReNew"
+    },
+    "final_customer": {
+      "name": "Compra directa de cliente final",
+      "documented_description": "El documento de precios publica precios directos de planta para recarga y bidón completo de 20 L.",
+      "source": "precios_agua_renew: Precios clientes Agua ReNew"
+    }
+  },
+  "documented_product_claims": [
+    {
+      "claim": "El gráfico incluido en el documento presenta: Agua Purificada Premium, pH 8.01 (ligeramente alcalina), Ósmosis Inversa, Luz UV + Ozono y 8 procesos de purificación.",
+      "nutrition_panel_per_100ml": {
+        "valor_energetico": "0 kcal",
+        "proteinas": "0 g",
+        "grasas_totales": "0 g",
+        "grasas_saturadas": "0 g",
+        "grasas_trans": "0 g",
+        "carbohidratos_totales": "0 g",
+        "azucares": "0 g",
+        "sodio": "0-1 mg"
+      },
+      "scope": "No especificado por el documento; no atribuir automáticamente a una presentación concreta.",
+      "source": "speech_maquila: gráfico insertado después de Galoneras de 10.5 L"
+    }
+  ],
+  "products": {
+    "maquila": [
+      {
+        "id": "maquila_bidon_20l",
+        "name": "Bidón recargable de 20 L",
+        "unit": "bidón / recarga",
+        "documented_inclusions": [
+          "Lavado y desinfección interna y externa", "Abrillantador", "Producción y llenado de agua purificada premium", "Ósmosis inversa (RO)", "Desinfección con luz UV y ozono", "Control de calidad", "Tapa nueva", "Precinto de seguridad en tapa", "Precinto de seguridad en caño"
+        ],
+        "prices": [
+          {
+            "scope": "recarga con envase propio; recojo en planta o puntos de recojo autorizados",
+            "quantity": { "min": 50, "unit": "unidades" },
+            "price": { "amount_pen": 6.0, "per": "unidad", "includes_igv": true },
+            "source": "speech_maquila: Maquila de bidones 20 litros"
+          },
+          {
+            "scope": "recarga con envase propio; precio escalonado",
+            "tiers": [
+              { "quantity": "hasta 400 recargas", "price": { "amount_pen": 6.0, "per": "unidad" } },
+              { "quantity": "401 a 650 recargas", "price": { "amount_pen": 5.8, "per": "unidad" } },
+              { "quantity": "desde 651 recargas", "price": { "amount_pen": 5.5, "per": "unidad" } }
+            ],
+            "includes_igv": true,
+            "collection": "recojo en planta",
+            "source": "speech_maquila: Maquila de bidones 20 litros"
+          },
+          {
+            "scope": "precio especial de maquila",
+            "quantity": { "min": 30, "unit": "unidades" },
+            "price": { "amount_pen": 6.0, "per": "bidón", "includes": ["llenado"] },
+            "source": "speech_maquila: Precios especiales bidones 20 litros"
+          },
+          {
+            "scope": "bidón nuevo de 20 L (envase + primera recarga); recojo en planta",
+            "price": { "amount_pen": 19.0, "per": "bidón", "includes_igv": true },
+            "excludes": ["etiqueta personalizada"],
+            "source": "speech_maquila: Maquila de bidones 20 litros"
+          }
+        ]
+      },
+      {
+        "id": "maquila_botella_1l_fliptop",
+        "name": "Botella de 1 L tapa fliptop con marca propia",
+        "package": { "contents": 10, "unit": "botellas", "per": "paquete" },
+        "minimum": { "value": 20, "unit": "paquetes" },
+        "inclusions": ["Agua purificada premium", "Ósmosis inversa (RO)", "Desinfección con luz UV y ozono", "Registro Sanitario", "Botella de 1 L", "Etiqueta personalizada con la marca del cliente"],
+        "tiers": [
+          { "quantity": "20 a 30 paquetes", "price": { "amount_pen": 1.5, "per": "botella" }, "package_price_pen": 15.0 },
+          { "quantity": "31 a 50 paquetes", "price": { "amount_pen": 1.4, "per": "botella" }, "package_price_pen": 14.0 },
+          { "quantity": "desde 51 paquetes", "price": { "amount_pen": 1.3, "per": "botella" }, "package_price_pen": 13.0 }
+        ],
+        "source": "speech_maquila: Maquila de botellas de 1 litro tapa fliptop"
+      },
+      {
+        "id": "maquila_botella_625ml_rosca",
+        "name": "Botella PET de 625 ml tapa rosca con marca propia",
+        "package": { "contents": 15, "unit": "botellas", "per": "paquete" },
+        "minimum": { "value": 20, "unit": "paquetes" },
+        "inclusions": ["Llenado y envasado", "Etiqueta personalizada con la marca del cliente", "Botella PET de 625 ml con tapa rosca"],
+        "tiers": [
+          { "quantity": "20 a 35 paquetes", "price": { "amount_pen": 0.8, "per": "botella" }, "package_price_pen": 12.0 },
+          { "quantity": "36 a 59 paquetes", "price": { "amount_pen": 0.75, "per": "botella" }, "package_price_pen": 11.25 },
+          { "quantity": "desde 60 paquetes", "price": { "amount_pen": 0.7, "per": "botella" }, "package_price_pen": 10.5 }
+        ],
+        "source": "speech_maquila: Maquila de botellas de 625 ml"
+      },
+      {
+        "id": "maquila_galonera_10_5l",
+        "name": "Galonera de 10.5 L no retornable",
+        "minimum": { "value": 50, "unit": "unidades" },
+        "tiers": [
+          { "quantity": "50 a 80 unidades", "price": { "amount_pen": 2.8, "per": "unidad" } },
+          { "quantity": "81 a 150 unidades", "price": { "amount_pen": 2.7, "per": "unidad" } },
+          { "quantity": "desde 151 unidades", "price": { "amount_pen": 2.5, "per": "unidad" } }
+        ],
+        "inclusions": ["Galonera de 10.5 L", "Tapa", "Asa", "Precinto de seguridad"],
+        "excludes": ["Etiqueta"],
+        "needs_advisor_confirmation": ["El documento no aclara expresamente si el precio incluye agua/llenado."] ,
+        "source": "speech_maquila: Galoneras de 10.5 L"
+      }
+    ],
+    "distribution_agua_renew": [
+      {
+        "id": "distribution_bidon_20l",
+        "name": "Recarga mayorista de bidón de 20 L Agua ReNew",
+        "unit": "recarga",
+        "price": { "amount_pen": 7.0, "per": "unidad" },
+        "minimum": { "value": 10, "unit": "recargas" },
+        "collection": "Directo de planta y puntos de distribución",
+        "source": "precios_agua_renew: Precios especiales para distribuidores; speech_maquila: Precios especiales bidones 20 litros"
+      },
+      {
+        "id": "distribution_bidon_20l_new",
+        "name": "Bidón nuevo de 20 L Agua ReNew",
+        "price": { "amount_pen": 20.0, "per": "bidón", "includes": ["envase", "primera recarga"] },
+        "source": "precios_agua_renew: Precios especiales para distribuidores; speech_maquila: Precios especiales bidones 20 litros"
+      },
+      {
+        "id": "distribution_botella_1l_fliptop",
+        "name": "Botella Agua ReNew de 1 L tapa fliptop",
+        "package": { "contents": 10, "unit": "botellas", "per": "paquete" },
+        "tiers": [
+          { "quantity": "5 a 9 paquetes", "price": { "amount_pen": 1.5, "per": "botella" }, "package_price_pen": 15.0 },
+          { "quantity": "10 a 20 paquetes", "price": { "amount_pen": 1.4, "per": "botella" }, "package_price_pen": 14.0 },
+          { "quantity": "desde 21 paquetes", "price": { "amount_pen": 1.3, "per": "botella" }, "package_price_pen": 13.0 }
+        ],
+        "source": "precios_agua_renew: Botellas de 1 litro tapa fliptop Agua ReNew"
+      },
+      {
+        "id": "distribution_botella_625ml_rosca",
+        "name": "Botella Agua ReNew de 625 ml tapa rosca",
+        "package": { "contents": 15, "unit": "botellas", "per": "paquete" },
+        "tiers": [
+          { "quantity": "5 a 15 paquetes", "price": { "amount_pen": 0.67, "per": "botella" }, "package_price_pen": 10.05 },
+          { "quantity": "16 a 30 paquetes", "price": { "amount_pen": 0.63, "per": "botella" }, "package_price_pen": 9.45 },
+          { "quantity": "desde 31 paquetes", "price": { "amount_pen": 0.6, "per": "botella" }, "package_price_pen": 9.0 }
+        ],
+        "source": "precios_agua_renew: Botellas de 625 ml tapa rosca Agua ReNew"
+      },
+      {
+        "id": "distribution_galonera_10_5l",
+        "name": "Galonera Agua ReNew de 10.5 L no retornable",
+        "offers": [
+          { "purchase_units": 20, "investment_pen": 60.0, "bonus_units": 1, "units_received": 21, "effective_unit_cost_pen": 2.86 },
+          { "purchase_units": 35, "investment_pen": 105.0, "bonus_units": 3, "units_received": 38, "effective_unit_cost_pen": 2.76 },
+          { "purchase_units": 50, "investment_pen": 145.0, "bonus_units": 3, "units_received": 53, "effective_unit_cost_pen": 2.74, "document_label": "Más vendido" },
+          { "purchase_units": 100, "investment_pen": 280.0, "bonus_units": 4, "units_received": 104, "effective_unit_cost_pen": 2.69 },
+          { "purchase_units": 200, "investment_pen": 540.0, "bonus_units": 6, "units_received": 206, "effective_unit_cost_pen": 2.62, "document_label": "Mejor precio" }
+        ],
+        "source": "precios_agua_renew: Agua ReNew — Galoneras 10.5 L"
+      }
+    ],
+    "final_customer": [
+      {
+        "id": "final_customer_bidon_20l_refill",
+        "name": "Recarga de bidón de 20 L",
+        "price": { "amount_pen": 12.0, "per": "recarga" },
+        "collection": "Compra directa en planta",
+        "source": "precios_agua_renew: Precios clientes Agua ReNew"
+      },
+      {
+        "id": "final_customer_bidon_20l_new",
+        "name": "Bidón completo de 20 L",
+        "price": { "amount_pen": 24.0, "per": "bidón", "includes": ["envase", "primera recarga"] },
+        "collection": "Compra directa en planta",
+        "source": "precios_agua_renew: Precios clientes Agua ReNew"
+      }
+    ]
+  },
+  "suggested_public_sale_prices": [
+    { "product": "Recarga de bidón de 20 L", "range_pen": "S/ 15.00", "scope": "Referencia de maquila", "source": "speech_maquila: Precio sugerido de venta al público" },
+    { "product": "Recarga de bidón de 20 L", "range_pen": "S/ 15.00 a S/ 17.00", "scope": "Referencia de maquila", "source": "speech_maquila: Precio sugerido de venta al cliente final" },
+    { "product": "Recarga de bidón de 20 L", "range_pen": "S/ 14.00 a S/ 15.00", "scope": "Referencia de distribución", "source": "precios_agua_renew: Precios referenciales de venta al público" },
+    { "product": "Recarga de bidón de 20 L", "range_pen": "S/ 15.00 a S/ 17.00", "scope": "Referencia de distribución", "source": "precios_agua_renew: Precios referenciales de venta al público (segunda sección)" },
+    { "product": "Bidón completo de 20 L", "range_pen": "S/ 30.00 a S/ 32.00", "scope": "Referencia de maquila", "source": "speech_maquila" },
+    { "product": "Bidón completo de 20 L", "range_pen": "S/ 30.00 a S/ 32.00", "scope": "Referencia de distribución", "source": "precios_agua_renew" },
+    { "product": "Botella de 1 L", "range_pen": "S/ 2.50", "scope": "Referencia de distribución", "source": "precios_agua_renew: primera sección" },
+    { "product": "Botella de 1 L", "range_pen": "S/ 2.50 a S/ 3.00", "scope": "Referencia de distribución", "source": "precios_agua_renew: segunda sección" },
+    { "product": "Botella de 625 ml", "range_pen": "S/ 1.20", "scope": "Referencia de distribución", "source": "precios_agua_renew" }
+  ],
+  "additional_services": [
+    {
+      "name": "Registro de marca",
+      "price": { "amount_pen": 900.0, "includes": ["tasa administrativa de Indecopi"] },
+      "includes": ["Análisis de viabilidad", "Presentación de solicitud ante Indecopi", "Seguimiento del expediente hasta su resolución", "Entrega del certificado una vez aprobado"],
+      "policy": "No es requisito para iniciar el servicio de maquila; se recomienda proteger la marca.",
+      "source": "speech_maquila: Registro de marca"
+    },
+    {
+      "name": "Etiquetas personalizadas",
+      "documented_offer": "Las primeras 100 etiquetas personalizadas con la marca se indican como obsequio dentro de una Promoción Maquila.",
+      "additional_label_prices": [
+        { "quantity": 250, "quantity_label": "1/4 de millar", "price_pen": 200.0 },
+        { "quantity": 500, "quantity_label": "1/2 millar", "price_pen": 350.0 },
+        { "quantity": 1000, "quantity_label": "1 millar", "price_pen": 500.0 }
+      ],
+      "replacement_label_price": { "amount_pen": 1.0, "per": "etiqueta", "includes_igv": true },
+      "material_and_life": "Material laminado resistente al agua y humedad; vida útil aproximada de 6 a 8 recargas en condiciones normales.",
+      "source": "speech_maquila: Etiquetas personalizadas; Costo de etiquetas"
+    },
+    {
+      "name": "Creación de logotipo profesional — Pack Básico",
+      "price": { "amount_pen": 70.0 },
+      "includes": ["2 propuestas de logotipo", "PDF editable compatible con CorelDRAW e Illustrator", "PNG con fondo transparente", "JPG de alta resolución", "Ajustes finales al diseño seleccionado"],
+      "payment": "50% de adelanto y saldo al momento de la entrega final.",
+      "delivery_time": "2 días hábiles desde la confirmación del pago inicial.",
+      "required_to_start": ["Nombre de la marca", "Rubro o actividad", "Colores de preferencia si los tiene", "Referencias de logos", "Público objetivo"],
+      "source": "speech_maquila: Creación de logotipo profesional"
+    },
+    {
+      "name": "Diseño e impresión de etiqueta personalizada",
+      "price": null,
+      "documented_description": "Agua ReNew puede diseñar y adaptar la etiqueta según especificaciones de impresión. La impresión puede gestionarse directamente con ellos a un costo preferencial.",
+      "response_rule": "Derivar a asesor: no se documenta una tarifa ni el alcance exacto.",
+      "source": "speech_maquila: Cuando cliente no cuenta con marca propia"
+    },
+    {
+      "name": "Muestra gratuita",
+      "price": { "amount_pen": 0.0 },
+      "required_data_maquila": ["Nombre de contacto", "Celular o WhatsApp", "Dirección completa y ubicación en tiempo actual (Google Maps o WhatsApp)"],
+      "required_data_distribution": ["Empresa o razón social, si aplica", "Nombre de contacto", "Celular o WhatsApp", "Correo electrónico", "Dirección completa y ubicación en tiempo actual (Google Maps o WhatsApp)"],
+      "delivery_time": "Se coordinará el envío en el menor tiempo posible.",
+      "source": "speech_maquila y precios_agua_renew: Solicita tu muestra gratuita"
+    }
+  ],
+  "delivery_and_collection": {
+    "maquila": {
+      "first_order": "Aproximadamente 3 días hábiles; el documento lo atribuye al diseño, aprobación e impresión de etiquetas personalizadas.",
+      "subsequent_orders": {
+        "plant_collection": "El mismo día, según programación de producción.",
+        "delivery": "Al día siguiente, de acuerdo con programación de rutas y orden de pedidos."
+      },
+      "collection_points": ["San Luis", "Puente Piedra", "San Juan de Miraflores"],
+      "delivery_price": "No documentado; se describe como tarifa accesible.",
+      "source": "speech_maquila: Tiempos de entrega; Oficina comercial y puntos de recojo"
+    },
+    "distribution_agua_renew": {
+      "collection_points": ["San Luis (frente a la VIDENA)", "Cercado de Lima", "Puente Piedra (Galería Mina de Oro)"],
+      "delivery": "Existe servicio de delivery. Para distribuidores se menciona tarifa preferencial según zona y cantidad; para clientes se menciona costo mínimo.",
+      "free_delivery": "Puente Piedra y Carabayllo para distribuidores.",
+      "other_districts": "Solicitar cotización personalizada para mayor volumen u otros distritos.",
+      "source": "precios_agua_renew: Condiciones comerciales; Puntos de recojo disponibles"
+    }
+  },
+  "policies": [
+    { "policy": "Confidencialidad de marcas maquiladas", "detail": "No se brinda información de marcas con las que se trabaja por acuerdos de reserva.", "source": "speech_maquila: Marcas que maquilamos" },
+    { "policy": "Información para empresas/competencia", "detail": "Para propuesta formal se solicita razón social, RUC, volumen mensual estimado, tipo de envase y necesidad de etiquetas personalizadas.", "source": "speech_maquila: Cuando pensamos que son empresas de la competencia" },
+    { "policy": "Comprobantes", "detail": "Boleta: nombres y apellidos, DNI, correo opcional. Factura: razón social, RUC, dirección fiscal y correo de envío.", "source": "speech_maquila: Datos para emitir comprobante" },
+    { "policy": "Precios sugeridos al público", "detail": "Son referenciales y pueden variar por zona, canal de venta y estrategia del distribuidor.", "source": "speech_maquila y precios_agua_renew" }
+  ],
+  "faq": [
+    { "question": "¿Necesito tener registrada mi marca para iniciar la maquila?", "answer": "No. El documento indica que no es requisito para iniciar; se recomienda realizar el registro para proteger la marca.", "source": "speech_maquila" },
+    { "question": "¿Pueden registrar mi marca?", "answer": "Sí. Se documenta un servicio de S/ 900 que incluye la tasa administrativa de Indecopi y las actividades descritas en additional_services.", "source": "speech_maquila" },
+    { "question": "¿Pueden decirme qué marcas maquilan?", "answer": "No se comparte esa información por una política de confidencialidad.", "source": "speech_maquila" },
+    { "question": "¿Puedo solicitar una muestra?", "answer": "Sí. Se documenta una muestra gratuita; se deben solicitar los datos de contacto y entrega aplicables a la modalidad.", "source": "speech_maquila y precios_agua_renew" },
+    { "question": "¿Qué necesito para empezar una cotización?", "answer": "Producto/presentación, modalidad (marca propia o Agua ReNew) y cantidad aproximada. Para una propuesta formal de empresa, se documentan datos adicionales.", "source": "speech_maquila y precios_agua_renew" }
+  ],
+  "ambiguities_and_conflicts": [
+    {
+      "id": "maquila_20l_minimum",
+      "topic": "Pedido mínimo de maquila de bidones de 20 L",
+      "statements": ["Pedido mínimo: 50 unidades.", "Como excepción, se puede producir desde 30 unidades.", "Precio especial de maquila desde 30 unidades."],
+      "bot_action": "No afirmar un único mínimo; confirmar con asesor para el pedido específico.",
+      "sources": ["speech_maquila: Maquila de bidones 20 litros", "speech_maquila: Cuando cliente no cuenta con marca propia", "speech_maquila: Precios especiales bidones 20 litros"]
+    },
+    {
+      "id": "maquila_label_offer_vs_cost",
+      "topic": "Etiquetas de primer pedido de maquila",
+      "statements": ["Promoción Maquila: primeras 100 etiquetas sin costo.", "Proyección de 30 bidones incluye 30 etiquetas a S/ 1.00 cada una.", "Bidón nuevo de S/ 19 no incluye etiqueta."],
+      "bot_action": "No calcular ni prometer etiquetas gratis sin confirmar si la promoción aplica al pedido actual.",
+      "sources": ["speech_maquila: Etiquetas personalizadas", "speech_maquila: Proyección 30 bidones", "speech_maquila: Maquila de bidones 20 litros"]
+    },
+    {
+      "id": "bidon_new_maquila_price_components",
+      "topic": "Costo de bidón nuevo de maquila",
+      "statements": ["Envase S/ 13 + maquila S/ 6 = S/ 19, no incluye etiqueta.", "Proyección de 30 bidones usa envase con caño a S/ 12.50 + recarga S/ 6 + etiqueta S/ 1."],
+      "bot_action": "Cotización a confirmar con asesor; no reconciliar precios ni asumir el tipo de envase/caño.",
+      "sources": ["speech_maquila: Maquila de bidones 20 litros", "speech_maquila: Proyección 30 bidones"]
+    },
+    {
+      "id": "public_suggested_prices",
+      "topic": "Precios sugeridos de reventa al público",
+      "statements": ["Recarga 20 L: S/ 14–15, S/ 15 y S/ 15–17 según secciones.", "Botella 1 L: S/ 2.50 y S/ 2.50–3.00 según secciones."],
+      "bot_action": "Indicar solo que son referenciales y derivar para confirmar el rango vigente/aplicable.",
+      "sources": ["speech_maquila", "precios_agua_renew"]
+    },
+    {
+      "id": "collection_points",
+      "topic": "Puntos de recojo",
+      "statements": ["Maquila: San Luis, Puente Piedra, San Juan de Miraflores.", "Distribución: San Luis frente a la VIDENA, Cercado de Lima, Puente Piedra Galería Mina de Oro."],
+      "bot_action": "Presentar puntos por modalidad; para dirección/horario exacto, derivar a asesor.",
+      "sources": ["speech_maquila", "precios_agua_renew"]
+    },
+    {
+      "id": "maquila_galonera_scope",
+      "topic": "Alcance de la galonera de 10.5 L en maquila",
+      "statements": ["Se detallan galonera, tapa, asa y precinto; no se declara expresamente si incluye llenado/agua."],
+      "bot_action": "Derivar a asesor antes de cotizar o confirmar inclusiones.",
+      "sources": ["speech_maquila: Galoneras de 10.5 L"]
+    },
+    {
+      "id": "proforma_package_mismatch",
+      "topic": "Proforma de agua de mesa",
+      "statements": ["La proforma indica paquete de 12 unidades a S/ 16.80 y no identifica con claridad la presentación; las escalas de 1 L indican paquetes de 10."],
+      "bot_action": "No usar la proforma como tarifa general; requerir asesor para ese producto/pedido.",
+      "sources": ["speech_maquila: Proforma de pedido; Maquila de botellas de 1 L"]
+    }
+  ]
+}

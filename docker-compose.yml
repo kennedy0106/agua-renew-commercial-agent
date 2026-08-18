@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: agua-renew-postgres
+    environment:
+      POSTGRES_DB: agua_renew
+      POSTGRES_USER: agua_renew
+      # Valor de desarrollo local; sobreescribible con POSTGRES_PASSWORD
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-agua_renew_local}
+    ports:
+      - "5432:5432"
+    volumes:
+      - agua_renew_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agua_renew -d agua_renew"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  agua_renew_postgres_data:

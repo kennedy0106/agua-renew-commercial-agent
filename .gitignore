@@ -1,0 +1,44 @@
+# ── Dependencias ──────────────────────────────────────────────
+node_modules/
+
+# ── Entorno y secretos ────────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ── Logs ──────────────────────────────────────────────────────
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# ── Cobertura / builds ────────────────────────────────────────
+coverage/
+dist/
+build/
+.next/
+
+# ── Sistema operativo ─────────────────────────────────────────
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ── Editores / IDE ────────────────────────────────────────────
+.vscode/
+.idea/
+
+# ── Artefactos de desarrollo local ────────────────────────────
+.doc_review/
+*.tmp
+*.bak
+*.orig
+*.rej
+
+# ── Datos locales de base de datos / dumps ────────────────────
+*.sql.dump
+*.dump
+pg_dump*.sql
+backup*.sql
+
+# ── Documentos estratégicos / comerciales locales (no runtime) ─
+PROJECT_PLAN_WHATSAPP_AUTOMATION.md
+knowledge/agua_renew_commercial_kb.md

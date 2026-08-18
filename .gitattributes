@@ -1,0 +1,13 @@
+# Normaliza saltos de línea: LF en el repo y en checkout (portable a Linux/Render)
+* text=auto
+*.mjs text eol=lf
+*.js text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.sql text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.html text eol=lf
+*.css text eol=lf
+*.example text eol=lf
+.gitignore text eol=lf
