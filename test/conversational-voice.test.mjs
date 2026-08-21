@@ -168,6 +168,7 @@ test('CANAL: Instagram/Messenger continúan en el mismo canal sin pedir WhatsApp
   // El canal llega desde el estado del engine al agente.
   const engine = await createAgentEngine(capturingProvider([
     { content: 'Hola, claro.' },
+    { content: '¡Hola! ¿En qué podemos ayudarle hoy?' },
   ]), 'instagram');
   await engine.dispatch({ type: 'submit_text', value: 'Hola' });
   assert.equal(stateOf(engine).channel, 'instagram');
@@ -201,6 +202,89 @@ test('MÉTRICAS: channel, generation_profile, temperature_used y max_tokens_used
   assert.equal(result.metrics.generation_profile, 'final_response');
   assert.equal(result.metrics.temperature_used, 0.3);
   assert.equal(result.metrics.max_tokens_used, 400);
+});
+
+// ── Cierre Bloque C: redacción customer-facing y transición segura ──
+
+test('SIN TOOL: respuesta social se redacta en final_response y nunca sale de la decisión', async () => {
+  const provider = capturingProvider([
+    { content: 'Con gusto, para eso estamos. ¿Desea revisar algo más?' },
+    { content: 'Con gusto. ¿Hay algo más que le gustaría revisar?' },
+  ]);
+  const result = await new CommercialAgent({ provider, tools: new CommercialToolRegistry({ commercialService: new CommercialService() }) })
+    .reply({ message: 'Gracias', state: {}, history: [] });
+  assert.equal(provider.calls.length, 2);
+  assert.equal(provider.calls[0].temperature, 0);
+  assert.equal(provider.calls[0].maxTokens, 1200);
+  assert.equal(provider.calls[1].temperature, 0.3);
+  assert.equal(provider.calls[1].maxTokens, 400);
+  assert.equal(result.metrics.generation_profile, 'final_response');
+  assert.equal(result.metrics.temperature_used, 0.3);
+  assert.equal(result.metrics.max_tokens_used, 400);
+  assert.equal(result.metrics.decisionTextFallbackUsed, false);
+  assert.equal(result.text, 'Con gusto. ¿Hay algo más que le gustaría revisar?');
+});
+
+async function quoteWithFinalText(finalText) {
+  const provider = capturingProvider([
+    { content: null, toolCalls: [toolCall('get_quote', { productId: 'maquila_botella_625ml_rosca', quantity: 20 })] },
+    { content: finalText },
+  ]);
+  return new CommercialAgent({ provider, tools: new CommercialToolRegistry({ commercialService: new CommercialService() }) })
+    .reply({ message: 'Quiero 20 paquetes de 625 ml', state: {}, history: [] });
+}
+
+test('TRANSICIÓN A: lenguaje discursivo se acepta antes de los facts', async () => {
+  const result = await quoteWithFinalText('De acuerdo, para esa cantidad quedaría así. ¿Desea revisar otra presentación?');
+  assert.match(result.text, /De acuerdo, para esa cantidad quedaría así/);
+  assert.match(result.text, /S\/ 12\.00 por paquete/);
+});
+
+test('TRANSICIÓN B: disponibilidad inmediata no sobrevive a la composición', async () => {
+  const result = await quoteWithFinalText('Excelente, tenemos disponibilidad inmediata para su pedido. ¿Desea avanzar?');
+  assert.equal(result.text.includes('disponibilidad'), false);
+  assert.match(result.text, /^De acuerdo\./);
+  assert.match(result.text, /S\/ 12\.00 por paquete/);
+});
+
+test('TRANSICIÓN C: un tiempo de entrega inventado no sobrevive', async () => {
+  const result = await quoteWithFinalText('Podemos entregarlo mañana. ¿Desea avanzar?');
+  assert.equal(result.text.includes('mañana'), false);
+  assert.equal(result.text.includes('entregarlo'), false);
+  assert.match(result.text, /^De acuerdo\./);
+});
+
+test('TRANSICIÓN D: una afirmación de rentabilidad no sobrevive', async () => {
+  const result = await quoteWithFinalText('Esta es nuestra opción más rentable. ¿Desea avanzar?');
+  assert.equal(result.text.includes('rentable'), false);
+  assert.match(result.text, /^De acuerdo\./);
+});
+
+test('TRANSICIÓN E: un monto generado no sobrevive (solo los facts autorizados)', async () => {
+  const result = await quoteWithFinalText('El precio sería S/ 300. ¿Desea avanzar?');
+  assert.equal(result.text.includes('S/ 300'), false);
+  assert.match(result.text, /S\/ 12\.00 por paquete/);
+});
+
+test('FOLLOW-UP: una pregunta con condición inventada se reemplaza por fallback seguro', async () => {
+  const result = await quoteWithFinalText('Tenemos stock disponible. ¿Desea que se lo enviemos mañana?');
+  assert.equal(result.text.includes('stock'), false);
+  assert.equal(result.text.includes('enviemos'), false);
+  assert.equal(result.text.includes('mañana'), false);
+  assert.match(result.text, /¿Desea revisar otra cantidad\?/);
+  assert.match(result.text, /S\/ 12\.00 por paquete/);
+});
+
+test('FOLLOW-UP sin cotización: pregunta segura genérica cuando el modelo inventa entrega', async () => {
+  const provider = capturingProvider([
+    { content: null, toolCalls: [toolCall('get_product_information', { productId: 'maquila_botella_625ml_rosca' })] },
+    { content: 'Esta presentación es la mejor. ¿Desea que se la entreguemos hoy mismo?' },
+  ]);
+  const result = await new CommercialAgent({ provider, tools: new CommercialToolRegistry({ commercialService: new CommercialService() }) })
+    .reply({ message: '¿Qué me conviene de 625 ml?', state: { modality: 'maquila' }, history: [] });
+  assert.equal(result.text.includes('hoy mismo'), false);
+  assert.equal(result.text.includes('entreguemos'), false);
+  assert.match(result.text, /¿Hay algo más que le gustaría revisar\?/);
 });
 
 // ── Escenarios de conversación (sección 37) ──

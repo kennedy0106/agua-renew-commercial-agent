@@ -150,9 +150,45 @@ function trailingQuestion(text) {
   return question.endsWith('?') ? question : `${question}?`;
 }
 
+/** Separa el cuerpo del texto de su pregunta final (si existe). Se usa para
+ * reconstruir una respuesta sin la pregunta insegura del modelo. */
+function splitTrailingQuestion(text) {
+  const t = String(text ?? '').trim();
+  const idx = t.lastIndexOf('?');
+  if (idx < 0) return { body: t, question: null };
+  const head = t.slice(0, idx);
+  const boundary = Math.max(head.lastIndexOf('. '), head.lastIndexOf('\n'));
+  const question = (boundary >= 0 ? t.slice(boundary + 2) : t).trim();
+  if (!question) return { body: t, question: null };
+  const body = boundary >= 0 ? t.slice(0, boundary + 2).trim() : '';
+  return { body, question: question.endsWith('?') ? question : `${question}?` };
+}
+
+/** Categorías de afirmaciones comerciales NO verificables (guard conservador por
+ * categorías, no listas de frases). Se aplica a la transición de cotización y a
+ * la pregunta final generadas por el modelo: si mencionan alguna, se descartan
+ * para no introducir hechos comerciales sin respaldo de herramientas. */
+const COMMERCIAL_CLAIM_TERMS = [
+  'stock', 'disponibilidad', 'disponible', 'inmediata', 'inmediato',
+  'entreg', 'envi',
+  'mañana', 'hoy mismo', 'horas', 'día hábil', 'dia habil', 'días hábiles', 'dias habiles', 'semanas',
+  'promoción', 'promocion', 'promo', 'descuento', 'oferta', 'bonificaci',
+  'rentable', 'rentabilidad', 'ganancia', 'más vendida', 'mas vendida', 'más vendido', 'mas vendido', 'popular',
+  'calidad', 'garantía', 'garantia', 'devoluci', 'reembolso',
+  'contrato', 'crédito', 'credito', 'financiamiento', 'adelanto', 'forma de pago',
+  'mínimo', 'minimo', 'mínima', 'total es', 'incluye', 'incluida', 'etiqueta personalizada',
+];
+
+function isUnsafeCommercialClaim(text) {
+  const t = String(text ?? '').toLowerCase();
+  return COMMERCIAL_CLAIM_TERMS.some((term) => t.includes(term));
+}
+
 /** Transición breve generada por el modelo para abrir una cotización
- * determinística. Solo se acepta si no contiene montos (integridad: los hechos
- * de dinero nunca provienen del texto libre) y no excede ~30 palabras. */
+ * determinística. Solo se acepta si es lenguaje discursivo: sin montos
+ * (integridad: el dinero nunca viene del texto libre), sin afirmaciones
+ * comerciales nuevas (stock, tiempos, rentabilidad, condiciones…) y sin
+ * exceder ~30 palabras. Si hay duda, se descarta (integridad > variedad). */
 function extractTransition(text) {
   const t = String(text ?? '').trim();
   const idx = t.lastIndexOf('?');
@@ -161,7 +197,15 @@ function extractTransition(text) {
   if (!cleaned) return null;
   if (/S\/\s?\d/.test(cleaned)) return null;
   if (cleaned.split(/\s+/).length > 30) return null;
+  if (isUnsafeCommercialClaim(cleaned)) return null;
   return cleaned;
+}
+
+/** Pregunta de cierre segura según contexto: si hubo cotización, invita a
+ * revisar otra cantidad; si no, abre a otra consulta. Nunca inventa
+ * condiciones comerciales. */
+function safeFollowUp(hasQuoteFacts) {
+  return hasQuoteFacts ? '¿Desea revisar otra cantidad?' : '¿Hay algo más que le gustaría revisar?';
 }
 
 function containsToolProtocolLeak(content, definitions) {
@@ -309,11 +353,41 @@ export class CommercialAgent {
     });
     if (protocolFailure) return { success: false, errorType: 'tool_protocol_invalid', trace, metrics };
     if (!first.toolCalls?.length) {
-      const guarded = this.tools.exposurePolicy.guardCustomerText(first.content?.trim() || '¿Qué le gustaría revisar?');
+      // DECISIÓN sin herramienta: el texto de decisión (temperature 0) jamás se
+      // entrega directo al prospecto. La redacción customer-facing se genera en
+      // una llamada con perfil final_response (temperature 0.3), que recibe el
+      // borrador de decisión como contexto y lo naturaliza.
+      const decisionText = first.content?.trim() || '';
+      const redactionMessages = [
+        { role: 'system', content: this.systemPrompt(memory, initialNextBestAction, channel, conversationHasStarted) },
+        ...turns,
+        { role: 'user', content: message },
+        ...(decisionText
+          ? [{ role: 'assistant', content: decisionText }, { role: 'user', content: 'Redacta la respuesta final para el prospecto con naturalidad y brevedad. No menciones herramientas, procesos ni planificación; no repitas textualmente el borrador ni tus razonamientos.' }]
+          : [{ role: 'user', content: 'Responde de forma natural y breve al prospecto. No menciones herramientas, procesos ni planificación.' }]),
+      ];
+      const redaction = await this.provider.complete({
+        messages: redactionMessages, tools: [], toolChoice: 'none',
+        ...GENERATION_PROFILES.final_response,
+      });
+      metrics.aiCallCount += 1; metrics.aiLatencyMs += redaction.latencyMs ?? 0; metrics.inputTokens += redaction.inputTokens ?? 0; metrics.outputTokens += redaction.outputTokens ?? 0;
+      trace.push({ phase: 'agent_final', finishReason: redaction.finishReason, generationProfile: 'final_response', temperatureUsed: GENERATION_PROFILES.final_response.temperature, maxTokensUsed: GENERATION_PROFILES.final_response.maxTokens });
+      const guarded = this.tools.exposurePolicy.guardCustomerText(redaction.content?.trim() || '');
+      let text = guarded.text;
+      let decisionTextFallbackUsed = false;
+      if (!text && decisionText) {
+        // Último recurso resiliente ante una redacción vacía: se registra para
+        // auditoría que el texto proviene del borrador de decisión.
+        text = this.tools.exposurePolicy.guardCustomerText(decisionText).text;
+        decisionTextFallbackUsed = true;
+      }
+      // Un monto sin respaldo de herramienta de dinero nunca llega al prospecto.
+      if (text && /S\/\s?\d/.test(text)) text = 'Permítame confirmar el precio exacto. ¿Qué presentación o servicio le interesa?';
       const { context: salesContext } = buildFinalContext([]);
-      const diagnostics = { ...responseDiagnostics(guarded.text), complexMarkdown: guarded.complexMarkdown, restrictedOutputSuppressed: guarded.restrictedSuppressed, multipleQuestionsSuppressed: guarded.multipleQuestionsSuppressed ?? false, handoffCategory: null, ...salesContext };
+      const generationContext = { channel, generation_profile: 'final_response', temperature_used: GENERATION_PROFILES.final_response.temperature, max_tokens_used: GENERATION_PROFILES.final_response.maxTokens };
+      const diagnostics = { ...responseDiagnostics(text), complexMarkdown: guarded.complexMarkdown, restrictedOutputSuppressed: guarded.restrictedSuppressed, multipleQuestionsSuppressed: guarded.multipleQuestionsSuppressed ?? false, handoffCategory: null, decisionTextFallbackUsed, ...salesContext, ...generationContext };
       trace.push({ phase: 'response_policy', ...diagnostics });
-      return { success: true, text: guarded.text, memory: finalMemory(salesContext), trace, metrics: { ...metrics, ...diagnostics } };
+      return { success: Boolean(text), text, memory: finalMemory(salesContext), trace, metrics: { ...metrics, ...diagnostics } };
     }
     const calls = first.toolCalls.slice(0, 4);
     const toolMessages = [];
@@ -343,33 +417,53 @@ export class CommercialAgent {
         toolMessages.push({ role: 'tool', tool_call_id: call.id, content: sanitizeToolResult(result) });
       }
     }
+    const nameById = new Map(this.tools.agentCatalog().map((product) => [product.id, product.name]));
+    const facts = composeCommercialFacts(metrics.tools, nameById);
+    const quoteGuardInstruction = facts
+      ? 'Cuando exista una cotización determinística, la transición previa solo puede ser lenguaje discursivo. No agregues hechos comerciales nuevos: nada de disponibilidad, tiempos, stock, rentabilidad, promociones, condiciones ni beneficios sin respaldo. Los hechos comerciales autorizados serán añadidos por el sistema.'
+      : '';
     const final = await this.provider.complete({
-      messages: [{ role: 'system', content: this.systemPrompt(memory, initialNextBestAction, channel, conversationHasStarted) }, ...turns, { role: 'user', content: message }, ...toolMessages],
+      messages: [{ role: 'system', content: this.systemPrompt(memory, initialNextBestAction, channel, conversationHasStarted) }, ...turns, { role: 'user', content: message }, ...toolMessages, ...(quoteGuardInstruction ? [{ role: 'user', content: quoteGuardInstruction }] : [])],
       tools: [], toolChoice: 'none',
       ...GENERATION_PROFILES.final_response,
     });
     metrics.aiCallCount += 1; metrics.aiLatencyMs += final.latencyMs ?? 0; metrics.inputTokens += final.inputTokens ?? 0; metrics.outputTokens += final.outputTokens ?? 0;
     trace.push({ phase: 'agent_final', finishReason: final.finishReason, generationProfile: 'final_response', temperatureUsed: GENERATION_PROFILES.final_response.temperature, maxTokensUsed: GENERATION_PROFILES.final_response.maxTokens });
-    const nameById = new Map(this.tools.agentCatalog().map((product) => [product.id, product.name]));
-    const facts = composeCommercialFacts(metrics.tools, nameById);
     const finalText = final.content?.trim() || '';
-    const followUp = trailingQuestion(finalText) ?? '¿Hay algo más en lo que pueda ayudarle?';
+    // La pregunta de cierre también se filtra: si el modelo inventa una
+    // condición comercial en ella (stock, entrega, tiempos…), se reemplaza por
+    // una pregunta segura según el contexto.
+    let followUp = trailingQuestion(finalText) ?? null;
+    let followUpReplaced = false;
+    if (followUp && (isUnsafeCommercialClaim(followUp) || /S\/\s?\d/.test(followUp))) {
+      followUp = null;
+      followUpReplaced = true;
+    }
+    if (!followUp) followUp = safeFollowUp(Boolean(facts));
     // Los hechos comerciales críticos (dinero y condiciones) son autoritativos:
     // se componen determinísticamente desde el resultado de la herramienta, no
     // desde el texto libre del modelo. El modelo aporta una transición breve
-    // (solo si no contiene montos) y la pregunta de cierre.
+    // (solo si es lenguaje discursivo) y la pregunta de cierre.
     let groundedText;
     if (facts) {
       const transition = extractTransition(finalText);
       const separator = transition && !/[?!.]$/.test(transition) ? '. ' : ' ';
-      const opener = transition ? `${transition}${separator}${facts}` : `Claro. ${facts}`;
+      const opener = transition ? `${transition}${separator}${facts}` : `De acuerdo. ${facts}`;
       groundedText = `${opener}\n\n${followUp}`;
     } else if (/S\/\s?\d/.test(finalText)) {
       // El modelo afirmó un monto sin respaldo de una herramienta de dinero:
       // se suprime para no arriesgar un precio inventado o incorrecto.
       groundedText = 'Permítame confirmar el precio exacto. ¿Qué presentación o servicio le interesa?';
     } else {
-      groundedText = finalText;
+      // Sin facts: se conserva el texto del modelo (el guard normaliza markdown
+      // y preguntas), salvo que su pregunta de cierre introduzca una condición
+      // comercial no grounded: entonces se reemplaza por una pregunta segura.
+      if (followUpReplaced) {
+        const { body } = splitTrailingQuestion(finalText);
+        groundedText = body ? `${body}\n\n${followUp}` : followUp;
+      } else {
+        groundedText = finalText;
+      }
     }
     const guarded = this.tools.exposurePolicy.guardCustomerText(groundedText);
     const audits = metrics.tools.map((tool) => tool.exposureAudit).filter(Boolean);

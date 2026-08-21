@@ -70,11 +70,27 @@ test('CommercialAgent conserva contexto explícito a través de update_conversat
   assert.equal(result.metrics.tools[0].args.businessType, 'una bodega');
 });
 
-test('CommercialAgent no hace segunda llamada para un saludo social sin herramienta', async () => {
-  const provider = scriptedProvider([{ content: '¡Hola! Gracias por escribirnos 😊 ¿Qué te gustaría revisar hoy?' }]);
+test('ComercialAgent redacta en final_response incluso un saludo social sin herramienta', async () => {
+  const calls = [];
+  const provider = {
+    async complete(input) {
+      calls.push(input);
+      if (calls.length === 1) return { content: '¡Hola! Gracias por escribirnos 😊 ¿Qué le gustaría revisar hoy?', toolCalls: [], latencyMs: 1, inputTokens: 1, outputTokens: 1 };
+      return { content: '¡Hola! ¿En qué podemos ayudarle hoy?', toolCalls: [], latencyMs: 1, inputTokens: 1, outputTokens: 1 };
+    },
+  };
   const result = await new CommercialAgent({ provider, tools: new CommercialToolRegistry({ commercialService: new CommercialService() }) })
     .reply({ message: 'Hola', state: {}, history: [] });
-  assert.equal(result.metrics.aiCallCount, 1);
+  // La decisión (temperature 0) nunca es la respuesta al cliente: el texto
+  // customer-facing sale del perfil final_response (temperature 0.3).
+  assert.equal(result.metrics.aiCallCount, 2);
+  assert.equal(calls[0].temperature ?? 0, 0);
+  assert.equal(calls[1].temperature ?? 0, 0.3);
+  assert.equal(calls[1].maxTokens, 400);
+  assert.equal(result.metrics.generation_profile, 'final_response');
+  assert.equal(result.metrics.temperature_used, 0.3);
+  assert.equal(result.metrics.max_tokens_used, 400);
+  assert.equal(result.text.includes('😊'), false);
   assert.match(result.text, /Hola/i);
 });
 
@@ -148,7 +164,10 @@ test('knowledge_lookup técnico se convierte en límite comercial seguro', () =>
 });
 
 test('la salida del agente se normaliza para WhatsApp y suprime detalles restringidos', async () => {
-  const provider = scriptedProvider([{ content: '### **Proceso**\nUsamos ósmosis, UV y ozono. ¿Qué deseas? ¿Algo más?' }]);
+  const provider = scriptedProvider([
+    { content: '### **Proceso**\nUsamos ósmosis, UV y ozono. ¿Qué deseas? ¿Algo más?' },
+    { content: '### **Proceso**\nUsamos ósmosis, UV y ozono. ¿Qué desea? ¿Algo más?' },
+  ]);
   const result = await new CommercialAgent({ provider, tools: new CommercialToolRegistry({ commercialService: new CommercialService() }) })
     .reply({ message: '¿Cómo fabrican el agua?', state: {}, history: [] });
   assert.equal(result.metrics.complexMarkdown, true);
@@ -169,7 +188,10 @@ test('la herramienta de límite sensible entrega una respuesta profesional sin d
 });
 
 test('la salida WhatsApp conserva una sola pregunta útil por turno', async () => {
-  const provider = scriptedProvider([{ content: 'Te puedo orientar con las presentaciones disponibles. ¿Cuál te interesa? ¿También quieres delivery?' }]);
+  const provider = scriptedProvider([
+    { content: 'Te puedo orientar con las presentaciones disponibles. ¿Cuál te interesa? ¿También quieres delivery?' },
+    { content: 'Te puedo orientar con las presentaciones disponibles. ¿Cuál te interesa? ¿También quieres delivery?' },
+  ]);
   const result = await new CommercialAgent({ provider, tools: new CommercialToolRegistry({ commercialService: new CommercialService() }) })
     .reply({ message: 'Quiero información', state: {}, history: [] });
   assert.equal(result.text, 'Te puedo orientar con las presentaciones disponibles. ¿Cuál te interesa?');
@@ -196,7 +218,7 @@ test('CommercialAgent reenvía un resultado DSML autorizado para cerrar la cotiz
   };
   const agent = new CommercialAgent({ provider, tools: new CommercialToolRegistry({ commercialService: new CommercialService() }) });
   await agent.reply({ message: '20 paquetes de 625 ml', state: {}, history: [] });
-  assert.match(calls[1].messages.at(-1).content, /Resultado autorizado de la consulta comercial/);
+  assert.ok(calls[1].messages.some((message) => /Resultado autorizado de la consulta comercial/.test(message.content ?? '')));
 });
 
 test('CommercialAgent completa una cotización si el modelo omite el precio de la herramienta', async () => {
