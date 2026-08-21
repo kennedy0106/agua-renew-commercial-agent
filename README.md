@@ -122,3 +122,15 @@ El modelo interpreta al usuario, selecciona herramientas y redacta lenguaje; **j
 - la composición determinística (`composeCommercialFacts`) que adjunta los hechos a la respuesta del agente.
 
 Un pedido bajo el mínimo se responde como situación comercial (`below_minimum`): se explica el mínimo vigente y se invita a ajustar la cantidad, sin derivar por defecto ni inventar precios.
+
+## Memoria comercial, etapa y siguiente mejor acción
+
+La capa `src/ai/sales-context.mjs` decide de forma determinística la etapa comercial y el siguiente paso, sin depender del LLM:
+
+- `SALES_STAGES`: `discovery`, `solution_presentation`, `qualification`, `quotation`, `objection_handling`, `purchase_preparation`, `handoff`.
+- `getNextBestAction(state)`: sugiere la siguiente acción comercial (preguntar modalidad/presentación/cantidad/logo, estado de envases, resolver objeción, cotizar, preparar compra, retomar tema pendiente, responder la pregunta actual). Es una guía, no una máquina de estados inflexible: una pregunta directa o un cambio de tema del prospecto se responde primero.
+- `suggestSalesStage(state, action)`: traduce la acción en etapa sugerida; nunca regresa la etapa a un estado anterior.
+
+La memoria del prospecto (`update_conversation_memory`) distingue `hasBrand` (tiene nombre de marca) de `hasLogo` (tiene logo definido), y guarda `useCase`, `hasOwnContainers`, `labelRequirements`, `paymentStatus`, `currentObjection`, `salesStage` y `pendingTopic`. Reglas: solo guarda información explícita (no infiere logo por marca, ni delivery por ubicación), no sobreescribe un valor confirmado con null por falta de mención, y no repite preguntas sobre datos ya confirmados.
+
+El agente no cierra prematuramente: una objeción activa (`currentObjection`) tiene prioridad sobre cualquier cierre, y la forma de pago general de maquila no está documentada (se confirma con asesor).

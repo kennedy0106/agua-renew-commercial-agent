@@ -90,7 +90,7 @@ test('un acknowledge con modalidad y movimiento comercial no pierde el hilo de l
   const { engine, provider } = await createEngine([plan({
     dialogue_act: 'acknowledge', intent: 'slot_update',
     updates: { modality: 'distribution_agua_renew' },
-    sales_stage: 'product_exploration', advisor_move: 'ask_product',
+    sales_stage: 'solution_presentation', advisor_move: 'ask_product',
     missing_information: ['product_id'], response_goal: 'acknowledge_modality_and_ask_product',
   })]);
   const result = await engine.dispatch({ type: 'submit_text', value: 'quiero trabajar con su marca' });
@@ -154,7 +154,7 @@ test('una aceptación ambigua retoma opciones previas y no reinicia el diagnóst
 test('un acto social no descarta una modalidad y un siguiente paso comerciales', async () => {
   const { engine } = await createEngine([plan({
     dialogue_act: 'affirm', intent: 'slot_update',
-    updates: { modality: 'maquila' }, sales_stage: 'product_exploration', advisor_move: 'ask_product',
+    updates: { modality: 'maquila' }, sales_stage: 'solution_presentation', advisor_move: 'ask_product',
     missing_information: ['product_id'], response_goal: 'acknowledge_modality_and_ask_product',
   })]);
   const result = await engine.dispatch({ type: 'submit_text', value: 'con mi propia marca' });
@@ -218,7 +218,7 @@ test('el asesor avanza por diagnóstico y no lista productos al detectar una mod
   assert.match(reply.text, /¿Qué presentación te interesa manejar\?/i);
   assert.doesNotMatch(reply.text, /Presentaciones documentadas|•/);
   assert.ok(reply.options.length > 0);
-  assert.equal(result.state.salesStage, 'product_exploration');
+  assert.equal(result.state.salesStage, 'solution_presentation');
   assert.equal(provider.requests.length, 3);
 });
 
@@ -244,7 +244,7 @@ test('la indecisión y la objeción avanzan con una única orientación consulti
   let result = await undecided.engine.dispatch({ type: 'submit_text', value: 'no sé cuál me conviene' });
   assert.match(result.messages.at(-1).text, /propia marca|comercializar productos/i);
 
-  const objection = await createEngine([plan({ intent: 'continue', sales_stage: 'decision', advisor_move: 'handle_objection' })]);
+  const objection = await createEngine([plan({ intent: 'continue', sales_stage: 'objection_handling', advisor_move: 'handle_objection' })]);
   result = await objection.engine.dispatch({ type: 'submit_text', value: 'me parece caro' });
   assert.match(result.messages.at(-1).text, /precio depende de la presentación y del volumen/i);
   assert.doesNotMatch(result.messages.at(-1).text, /descuento/i);
@@ -268,7 +268,7 @@ test('la compra para consumo propio reconoce la necesidad y explica las dos opci
   const { engine } = await createEngine([plan({
     dialogue_act: 'inform', intent: 'slot_update',
     updates: { modality: 'final_customer', customer_goal: 'consumo propio' },
-    sales_stage: 'product_exploration', advisor_move: 'ask_product',
+    sales_stage: 'solution_presentation', advisor_move: 'ask_product',
   })]);
   const result = await engine.dispatch({ type: 'submit_text', value: 'quiero comprar Agua ReNew para mi consumo' });
   const reply = result.messages.at(-1);
@@ -285,7 +285,7 @@ test('una consulta multitema conserva precios y mínimos en lugar de volver a pe
     dialogue_act: 'request_information', intent: 'information_request',
     updates: { modality: 'distribution_agua_renew', requested_information: ['prices', 'minimums'] },
     operation: { name: 'get_product_comparison', args: { modality: 'distribution_agua_renew', requestedInformation: ['prices', 'minimums'] } },
-    sales_stage: 'product_exploration', advisor_move: 'present_options',
+    sales_stage: 'solution_presentation', advisor_move: 'present_options',
   })]);
   const result = await engine.dispatch({ type: 'submit_text', value: 'quiero saber el precio y pedido mínimo de cada presentación' });
   const reply = result.messages.at(-1).text;

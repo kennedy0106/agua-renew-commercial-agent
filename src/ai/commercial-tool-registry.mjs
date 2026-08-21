@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { CommercialExposurePolicy } from './commercial-exposure-policy.mjs';
+import { SALES_STAGES, OBJECTIONS } from './sales-context.mjs';
 
 const KNOWLEDGE_FILE = fileURLToPath(new URL('../../knowledge/agua_renew_commercial_data.json', import.meta.url));
 const string = { type: 'string' };
@@ -29,7 +30,7 @@ export class CommercialToolRegistry {
       this.tool('get_service_information', 'Obtiene detalles y precio de un servicio adicional aprobado.', object({ serviceName: { type: 'string', enum: serviceNames }, topic: string }, ['serviceName'])),
       this.tool('knowledge_lookup', 'Consulta información textual aprobada de un tema.', object({ topic: { type: 'string', enum: ['maquila', 'distribution', 'brand_registration', 'labels', 'logo', 'sample', 'invoice', 'collection', 'product_info', 'payment'] } }, ['topic'])),
       this.tool('get_information_boundary', 'Responde de manera segura ante una solicitud técnica, confidencial o formal.', object({ category: { type: 'string', enum: ['technical_information_request', 'confidential_information_request', 'formal_business_request', 'negotiation', 'commercial_exception'] } }, ['category'])),
-      this.tool('update_conversation_memory', 'Guarda solo contexto explícito del prospecto.', object({ businessType: string, customerGoal: string, experienceLevel: string, commercialIntent: string, modality: { type: 'string', enum: MODALITIES }, productId: string, quantity: { type: 'integer', minimum: 1 }, district: string, hasBrand: bool, needsDesign: bool, sampleInterest: bool, purchaseReadiness: { type: 'string', enum: READINESS }, pendingTopic: string, questionsResolved: { type: 'array', items: string } })),
+      this.tool('update_conversation_memory', 'Guarda solo contexto explícito del prospecto. No infieras hechos: no asumas logo si solo hay marca, ni delivery si solo pregunta ubicación. No repitas datos ya confirmados.', object({ businessType: string, customerGoal: string, useCase: string, experienceLevel: string, commercialIntent: string, modality: { type: 'string', enum: MODALITIES }, productId: string, quantity: { type: 'integer', minimum: 1 }, district: string, hasBrand: bool, brandName: string, hasLogo: bool, needsDesign: bool, hasOwnContainers: bool, labelRequirements: string, paymentStatus: string, sampleInterest: bool, purchaseReadiness: { type: 'string', enum: READINESS }, currentObjection: { type: 'string', enum: OBJECTIONS }, salesStage: { type: 'string', enum: SALES_STAGES }, pendingTopic: string, questionsResolved: { type: 'array', items: string } })),
       this.tool('prepare_handoff', 'Prepara el resumen para un asesor humano, sin derivar todavía.', object({ reason: string, pendingQuestion: string })),
       this.tool('request_human_handoff', 'Deriva por negociación, cierre, condición especial, bloqueo o solicitud explícita.', object({ reason: string, pendingQuestion: string, category: { type: 'string', enum: ['technical_information_request', 'confidential_information_request', 'formal_business_request', 'negotiation', 'commercial_exception', 'explicit_request'] } }, ['reason'])),
     ];
@@ -112,9 +113,12 @@ export class CommercialToolRegistry {
     const product = state.productId ? this.commercialService.get_product(state.productId) : null;
     return {
       business_type: state.businessType ?? null, customer_goal: state.customerGoal ?? null,
-      district: state.district ?? null, modality: state.modality ?? null,
+      use_case: state.useCase ?? null, district: state.district ?? null, modality: state.modality ?? null,
       product: product?.status === 'ok' ? { id: product.data.id, name: product.data.name } : null,
       quantity: state.quantity ?? null, purchase_readiness: state.purchaseReadiness ?? 'exploring',
+      has_brand: state.hasBrand ?? null, brand_name: state.brandName ?? null, has_logo: state.hasLogo ?? null,
+      has_own_containers: state.hasOwnContainers ?? null, current_objection: state.currentObjection ?? null,
+      sales_stage: state.salesStage ?? 'discovery',
       questions_resolved: state.questionsResolved ?? [], commercial_interest: state.commercialIntent ?? null,
       pending_topic: state.pendingTopic ?? null, handoff_reason: reason,
     };
@@ -133,6 +137,8 @@ export class CommercialToolRegistry {
     if (args.modality !== undefined && !MODALITIES.includes(args.modality)) return { valid: false, field: 'modality' };
     if (args.quantity !== undefined && (!Number.isInteger(args.quantity) || args.quantity <= 0)) return { valid: false, field: 'quantity' };
     if (args.purchaseReadiness !== undefined && !READINESS.includes(args.purchaseReadiness)) return { valid: false, field: 'purchaseReadiness' };
+    if (args.salesStage !== undefined && !SALES_STAGES.includes(args.salesStage)) return { valid: false, field: 'salesStage' };
+    if (args.currentObjection !== undefined && !OBJECTIONS.includes(args.currentObjection)) return { valid: false, field: 'currentObjection' };
     if (args.category !== undefined && !HANDOFF_CATEGORIES.includes(args.category)) return { valid: false, field: 'category' };
     if (args.questionsResolved !== undefined && (!Array.isArray(args.questionsResolved) || args.questionsResolved.some((item) => typeof item !== 'string'))) return { valid: false, field: 'questionsResolved' };
     return { valid: true };

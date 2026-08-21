@@ -35,11 +35,11 @@ test('normaliza aliases estructurales de mínimos sin depender de la frase del c
       intent: 'information_request', dialogue_act: 'request_information', confidence: 0.9,
       updates: { modality: 'maquila', requested_information: [] },
       operation: { name: 'get_product_comparison', args: { modality: 'maquila', requestedInformation: 'minimum_order' } },
-      missing_information: [], sales_stage: 'product_exploration', advisor_move: 'offer_next_step', response_goal: 'continue_conversation',
+      missing_information: [], sales_stage: 'solution_presentation', advisor_move: 'offer_next_step', response_goal: 'continue_conversation',
     });
     const result = await subject.interpret({
       message,
-      conversationState: { modality: 'maquila', productId: 'maquila_botella_1l_fliptop', quantity: null, district: null, salesStage: 'product_exploration', pendingField: null, lastTopic: null, lastAssistantAct: null, offeredOptions: [], requestedInformation: [] },
+      conversationState: { modality: 'maquila', productId: 'maquila_botella_1l_fliptop', quantity: null, district: null, salesStage: 'solution_presentation', pendingField: null, lastTopic: null, lastAssistantAct: null, offeredOptions: [], requestedInformation: [] },
     });
     assert.equal(result.success, true);
     assert.deepEqual(result.interpretation.requestedInformation, ['minimums']);

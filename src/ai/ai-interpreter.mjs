@@ -1,3 +1,5 @@
+import { SALES_STAGES } from './sales-context.mjs';
+
 const INTENTS = new Set([
   'greeting', 'list_products', 'product_information', 'quote', 'delivery',
   'additional_service', 'suggested_resale_price', 'human_handoff', 'continue', 'slot_update',
@@ -12,7 +14,7 @@ const RESPONSE_GOALS = new Set([
   'explain_modality', 'clarify_modality', 'offer_products', 'offer_quote', 'acknowledge',
   'thank_user', 'farewell', 'handoff', 'ask_clarification', 'unknown',
 ]);
-const SALES_STAGES = new Set(['discovery', 'qualification', 'product_exploration', 'quotation', 'decision', 'handoff']);
+const SALES_STAGES_SET = new Set(SALES_STAGES);
 const ADVISOR_MOVES = new Set([
   'acknowledge', 'clarify', 'explain', 'ask_need', 'ask_product', 'ask_quantity',
   'present_options', 'quote', 'handle_objection', 'offer_next_step', 'handoff',
@@ -232,7 +234,7 @@ export class AIInterpreter {
     if (![businessType, customerGoal, experienceLevel].every(validNullableString)) return { valid: false, reason: 'Contexto comercial no válido.' };
     if (!requestedInformation) return { valid: false, reason: 'Información solicitada no válida.' };
     const salesStage = value.sales_stage ?? 'discovery';
-    if (!SALES_STAGES.has(salesStage)) return { valid: false, reason: 'Etapa comercial no permitida.' };
+    if (!SALES_STAGES_SET.has(salesStage)) return { valid: false, reason: 'Etapa comercial no permitida.' };
     let advisorMove = value.advisor_move ?? (value.intent === 'quote' ? 'quote' : value.intent === 'human_handoff' ? 'handoff' : 'offer_next_step');
     if (!ADVISOR_MOVES.has(advisorMove)) return { valid: false, reason: 'Movimiento del asesor no permitido.' };
     if (dialogueAct === 'greeting') advisorMove = 'acknowledge';

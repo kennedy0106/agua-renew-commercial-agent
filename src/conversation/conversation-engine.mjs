@@ -18,8 +18,10 @@ function initialState(mode = 'deterministic') {
     stage: 'choose_family', family: null, modality: null, productId: null,
     quantity: null, purchaseType: null, fulfillment: null, handoffRequired: false,
     handoffRecorded: false, quoteRequestCreated: false, pendingField: null, pendingAction: null,
-    district: null, businessType: null, customerGoal: null, experienceLevel: null, commercialIntent: null,
-    hasBrand: null, needsDesign: null, sampleInterest: null, purchaseReadiness: 'exploring',
+    district: null, businessType: null, customerGoal: null, useCase: null, experienceLevel: null, commercialIntent: null,
+    hasBrand: null, brandName: null, hasLogo: null, needsDesign: null, hasOwnContainers: null,
+    labelRequirements: null, paymentStatus: null, currentObjection: null, sampleInterest: null,
+    purchaseReadiness: 'exploring',
     questionsResolved: [], pendingTopic: null, requestedInformation: [], socialOpeningPending: false,
     salesStage: 'discovery', activeIntent: null, lastAssistantAct: null, lastTopic: null, lastReferencedProduct: null, offeredOptions: [], mode,
   };
@@ -461,6 +463,9 @@ export class ConversationEngine {
         if (this.turnMetric) { this.turnMetric.fallbackReason = result.errorType ?? 'agent_empty_response'; this.turnMetric.technicalFallback = true; }
         return this.fallbackFromAI(text, result.errorType);
       }
+      // Memoria determinística del agente (estado previo + etapa sugerida); luego
+      // los args de update_conversation_memory de este turno (más nuevos) ganan.
+      this.applyAgentMemory(result.memory);
       this.applyAgentToolMemory(result.metrics?.tools ?? []);
       const priceTool = result.metrics?.tools?.find((tool) => ['get_quote', 'get_purchase_price'].includes(tool.name) && tool.resultStatus === 'ok');
       if (priceTool && !this.state.quoteRequestCreated && Number.isInteger(priceTool.args?.quantity)) {
@@ -471,6 +476,12 @@ export class ConversationEngine {
         });
         this.state.quoteRequestCreated = true;
       }
+      // Una cotización entregada implica que la objeción activa dejó de bloquear:
+      // se limpia salvo que el modelo la haya re-afirmado explícitamente este turno.
+      const reassertedObjection = (result.metrics?.tools ?? []).some(
+        (tool) => tool.name === 'update_conversation_memory' && tool.args?.currentObjection,
+      );
+      if (priceTool && !reassertedObjection) this.state.currentObjection = null;
       const prepared = result.metrics?.tools?.find((tool) => tool.name === 'prepare_handoff')?.result?.data?.lead_summary ?? null;
       if (result.handoff) {
         if (prepared) result.handoff.context = { ...(result.handoff.context ?? {}), lead_summary: prepared };
@@ -497,15 +508,57 @@ export class ConversationEngine {
       if (args.productId) this.state.lastReferencedProduct = args.productId;
       if (args.businessType) this.state.businessType = args.businessType;
       if (args.customerGoal) this.state.customerGoal = args.customerGoal;
+      if (args.useCase) this.state.useCase = args.useCase;
       if (args.experienceLevel) this.state.experienceLevel = args.experienceLevel;
       if (args.lastTopic) this.state.lastTopic = args.lastTopic;
       if (args.commercialIntent) this.state.commercialIntent = args.commercialIntent;
       if (typeof args.hasBrand === 'boolean') this.state.hasBrand = args.hasBrand;
+      if (args.brandName) this.state.brandName = args.brandName;
+      if (typeof args.hasLogo === 'boolean') this.state.hasLogo = args.hasLogo;
       if (typeof args.needsDesign === 'boolean') this.state.needsDesign = args.needsDesign;
+      if (typeof args.hasOwnContainers === 'boolean') this.state.hasOwnContainers = args.hasOwnContainers;
+      if (args.labelRequirements) this.state.labelRequirements = args.labelRequirements;
+      if (args.paymentStatus) this.state.paymentStatus = args.paymentStatus;
+      if (args.currentObjection) this.state.currentObjection = args.currentObjection;
       if (typeof args.sampleInterest === 'boolean') this.state.sampleInterest = args.sampleInterest;
       if (args.purchaseReadiness) this.state.purchaseReadiness = args.purchaseReadiness;
+      if (args.salesStage) this.state.salesStage = args.salesStage;
       if (Array.isArray(args.questionsResolved)) this.state.questionsResolved = [...new Set([...this.state.questionsResolved, ...args.questionsResolved])];
       if (args.pendingTopic) this.state.pendingTopic = args.pendingTopic;
+    }
+  }
+
+  /** Aplica la memoria compacta determinística del agente sin sobreescribir
+   * valores confirmados con null (regla: un dato no mencionado no se borra). */
+  applyAgentMemory(memory) {
+    const m = memory ?? {};
+    const set = (key, value) => {
+      if (value !== null && value !== undefined && value !== '') this.state[key] = value;
+    };
+    set('businessType', m.business_type);
+    set('customerGoal', m.customer_goal);
+    set('useCase', m.use_case);
+    set('experienceLevel', m.experience_level);
+    set('modality', m.modality);
+    set('productId', m.product_id);
+    set('quantity', m.quantity);
+    set('district', m.district);
+    set('lastTopic', m.last_topic);
+    set('lastReferencedProduct', m.last_referenced_product);
+    set('commercialIntent', m.commercial_intent);
+    set('brandName', m.brand_name);
+    set('labelRequirements', m.label_requirements);
+    set('paymentStatus', m.payment_status);
+    set('currentObjection', m.current_objection);
+    set('salesStage', m.sales_stage);
+    for (const [key, value] of [
+      ['hasBrand', m.has_brand], ['needsDesign', m.needs_design], ['sampleInterest', m.sample_interest],
+      ['hasLogo', m.has_logo], ['hasOwnContainers', m.has_own_containers],
+    ]) {
+      if (typeof value === 'boolean') this.state[key] = value;
+    }
+    if (Array.isArray(m.questions_resolved)) {
+      this.state.questionsResolved = [...new Set([...this.state.questionsResolved, ...m.questions_resolved])];
     }
   }
 
@@ -811,7 +864,7 @@ export class ConversationEngine {
         requestedInformation: args.requestedInformation ?? this.state.requestedInformation,
       });
       if (result.status === 'ok') {
-        this.state.salesStage = 'product_exploration';
+        this.state.salesStage = 'solution_presentation';
         await this.addBot(this.responseComposer.composeProductComparison(result.data));
       } else await this.resolveCommercialResult(result);
       return;
@@ -854,7 +907,7 @@ export class ConversationEngine {
     const modalityResult = this.commercialService.get_commercial_modality(modality);
     const products = this.commercialService.list_products({ modality });
     if (modalityResult.status !== 'ok' || products.status !== 'ok') return this.respondToClarification();
-    this.state.salesStage = 'product_exploration';
+    this.state.salesStage = 'solution_presentation';
     this.state.stage = 'choose_product';
     this.state.pendingField = 'product';
     this.setAssistantContext({ act: 'ask_product', topic: modality, offeredOptions: [] });
@@ -869,7 +922,7 @@ export class ConversationEngine {
   }
 
   async respondToPriceConcern() {
-    this.state.salesStage = 'decision';
+    this.state.salesStage = 'objection_handling';
     this.setAssistantContext({ act: 'handle_objection', topic: 'price', offeredOptions: [] });
     await this.addBot(this.advisorVoice.priceConcern(), [button('Hablar con un asesor', 'request_handoff')]);
   }
@@ -1073,7 +1126,7 @@ export class ConversationEngine {
         this.state.quoteRequestCreated = true;
       }
       this.state.stage = 'complete';
-      this.state.salesStage = 'decision';
+      this.state.salesStage = 'purchase_preparation';
       await this.addBot(this.responseComposer.composePurchasePrice(result.data), [button('Nueva consulta', 'restart')], 'result');
       return;
     }
