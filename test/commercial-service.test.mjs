@@ -42,11 +42,9 @@ test('consulta precio de cliente final como precio de compra directo de planta',
   assert.equal(result.data.collection, 'Compra directa en planta');
 });
 
-test('las siete ambigüedades documentadas tienen una regla de bloqueo', () => {
+test('las cinco ambigüedades vigentes tienen regla de bloqueo; dos fueron superadas por overrides', () => {
   const coveredIds = new Set([
-    ...service.check_ambiguities({ operation: 'purchase_price', productId: 'maquila_bidon_20l', quantity: 30 }).ambiguities,
     ...service.check_ambiguities({ modality: 'maquila', topic: 'first_order_labels' }).ambiguities,
-    ...service.check_ambiguities({ operation: 'purchase_price', productId: 'maquila_bidon_20l', purchaseType: 'new_bidon_first_refill', quantity: 50 }).ambiguities,
     ...service.check_ambiguities({ operation: 'suggested_resale_price', productName: 'Recarga de bidón de 20 L' }).ambiguities,
     ...service.check_ambiguities({ operation: 'delivery_information' }).ambiguities,
     ...service.check_ambiguities({ operation: 'purchase_price', productId: 'maquila_galonera_10_5l' }).ambiguities,
@@ -56,26 +54,31 @@ test('las siete ambigüedades documentadas tienen una regla de bloqueo', () => {
   assert.deepEqual(
     coveredIds,
     new Set([
-      'maquila_20l_minimum',
       'maquila_label_offer_vs_cost',
-      'bidon_new_maquila_price_components',
       'public_suggested_prices',
       'collection_points',
       'maquila_galonera_scope',
       'proforma_package_mismatch',
     ]),
   );
+  // maquila_20l_minimum y bidon_new_maquila_price_components quedan documentadas
+  // en el JSON fuente pero ya no bloquean (superadas por commercial_overrides.json).
+  assert.equal(service.check_ambiguities({ operation: 'purchase_price', productId: 'maquila_bidon_20l', quantity: 30 }).blocked, false);
+  assert.equal(service.check_ambiguities({ operation: 'purchase_price', productId: 'maquila_bidon_20l', purchaseType: 'new_bidon_first_refill', quantity: 50 }).blocked, false);
 });
 
-test('bloquea maquila de bidones 20 L cuando el mínimo es ambiguo', () => {
+test('CASO 5: maquila de bidones 20 L no ofrece la excepción de 30: below_minimum con mínimo vigente 50', () => {
   const result = service.get_purchase_price({
     productId: 'maquila_bidon_20l',
     purchaseType: 'refill_with_own_container',
     quantity: 30,
   });
-  assert.equal(result.status, 'blocked');
-  assert.equal(result.message, HANDOFF_MESSAGE);
-  assert.equal(result.ambiguities[0].id, 'maquila_20l_minimum');
+  assert.equal(result.status, 'below_minimum');
+  assert.equal(result.handoff_required, undefined);
+  assert.equal(result.data.minimum.value, 50);
+  assert.equal(result.data.minimum.unit, 'unidades');
+  assert.equal(result.data.quantity, 30);
+  assert.match(result.message, /50/);
 });
 
 test('maquila de bidones 20 L sin cantidad solicita cantidad sin derivar', () => {
@@ -111,14 +114,21 @@ test('maquila de más de 400 recargas en punto autorizado solicita cambio o conf
   assert.match(result.message, /recojo en planta/);
 });
 
-test('bloquea el precio del bidón nuevo de maquila por componentes contradictorios', () => {
+test('CASO 6: consulta el bidón nuevo de maquila (S/ 19) cuando están todos los datos', () => {
   const result = service.get_purchase_price({
     productId: 'maquila_bidon_20l',
     purchaseType: 'new_bidon_first_refill',
     quantity: 50,
   });
-  assert.equal(result.status, 'blocked');
-  assert.ok(result.ambiguities.some((item) => item.id === 'bidon_new_maquila_price_components'));
+  assert.equal(result.status, 'ok');
+  assert.equal(result.data.price.amount_pen, 19);
+  assert.equal(result.data.purchase_type, 'new_bidon_first_refill');
+  assert.deepEqual(result.data.inclusions, ['envase', 'primera recarga']);
+  assert.deepEqual(result.data.exclusions, ['etiqueta personalizada']);
+  assert.equal(result.data.label_included, false);
+  assert.equal(result.data.minimum.value, 50);
+  assert.equal(result.data.fulfillment, 'plant_collection');
+  assert.equal(result.data.collection, 'recojo en planta');
 });
 
 test('bloquea promesa de etiquetas de primer pedido', () => {
@@ -348,4 +358,66 @@ test('requiere cantidad cuando una escala de precio la necesita', () => {
   });
   assert.equal(result.status, 'input_required');
   assert.deepEqual(result.required, ['quantity']);
+});
+
+// ── BLOQUE A · FASE 1/2: reglas vigentes y cotización completa ──
+
+test('CASO 1: maquila 625 ml, 20 paquetes: precio, paquete de 15, mínimo 20, etiqueta incluida', () => {
+  const result = service.get_purchase_price({ productId: 'maquila_botella_625ml_rosca', quantity: 20 });
+  assert.equal(result.status, 'ok');
+  assert.equal(result.data.tier.price.amount_pen, 0.8);
+  assert.equal(result.data.tier.package_price_pen, 12);
+  assert.deepEqual(result.data.package, { contents: 15, unit: 'botellas', per: 'paquete' });
+  assert.deepEqual(result.data.minimum, { value: 20, unit: 'paquetes' });
+  assert.equal(result.data.label_included, true);
+});
+
+test('CASO 2: maquila 625 ml, 5 paquetes: no cotiza; mínimo 20 de forma estructurada', () => {
+  const result = service.get_purchase_price({ productId: 'maquila_botella_625ml_rosca', quantity: 5 });
+  assert.equal(result.status, 'below_minimum');
+  assert.equal(result.handoff_required, undefined);
+  assert.equal(result.data.quantity, 5);
+  assert.equal(result.data.minimum.value, 20);
+  assert.equal(result.data.minimum.unit, 'paquetes');
+  assert.match(result.message, /mínimo vigente/);
+});
+
+test('CASO 3: maquila 1 L, 20 paquetes: precio, paquete de 10, mínimo 20, etiqueta incluida', () => {
+  const result = service.get_purchase_price({ productId: 'maquila_botella_1l_fliptop', quantity: 20 });
+  assert.equal(result.status, 'ok');
+  assert.equal(result.data.tier.price.amount_pen, 1.5);
+  assert.equal(result.data.tier.package_price_pen, 15);
+  assert.deepEqual(result.data.package, { contents: 10, unit: 'botellas', per: 'paquete' });
+  assert.deepEqual(result.data.minimum, { value: 20, unit: 'paquetes' });
+  assert.equal(result.data.label_included, true);
+});
+
+test('CASO 4: maquila bidón 20 L, 50 recargas con envase propio: S/ 6.00 y mínimo 50', () => {
+  const result = service.get_purchase_price({
+    productId: 'maquila_bidon_20l', purchaseType: 'refill_with_own_container',
+    fulfillment: 'plant_collection', quantity: 50,
+  });
+  assert.equal(result.status, 'ok');
+  assert.equal(result.data.tier.price.amount_pen, 6);
+  assert.equal(result.data.purchase_type, 'refill_with_own_container');
+  assert.equal(result.data.minimum.value, 50);
+  assert.equal(result.data.label_included, false);
+});
+
+test('CASO 7: etiqueta personalizada: 625 ml y 1 L incluida; 20 L nuevo no incluida', () => {
+  assert.equal(service.labelIncluded('maquila_botella_625ml_rosca'), true);
+  assert.equal(service.labelIncluded('maquila_botella_1l_fliptop'), true);
+  assert.equal(service.labelIncluded('maquila_bidon_20l', 'new_bidon_first_refill'), false);
+  assert.equal(service.labelIncluded('maquila_bidon_20l', 'refill_with_own_container'), false);
+});
+
+test('CASO 8: la forma de pago general de maquila no está documentada y no reutiliza el 50% del logo', () => {
+  const policy = service.get_payment_policy();
+  assert.equal(policy.status, 'ok');
+  assert.equal(policy.data.maquila_general.status, 'not_documented');
+  assert.ok(policy.data.maquila_general.do_not_reuse.includes('Creación de logotipo profesional — Pack Básico'));
+  // El 50% de adelanto pertenece únicamente al servicio de logotipo.
+  const logo = service.get_additional_service('Creación de logotipo profesional — Pack Básico');
+  assert.equal(logo.status, 'ok');
+  assert.match(logo.data.payment, /50%/);
 });

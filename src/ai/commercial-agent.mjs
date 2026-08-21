@@ -43,26 +43,34 @@ function pluralPer(per, quantity) {
 function quoteFact(data, productName) {
   const quantity = Number.isFinite(data.quantity) && data.quantity > 0 ? data.quantity : null;
   const label = productName ? `${productName}: ` : '';
+  let sentence = null;
 
   if (data.tier?.package_price_pen !== undefined && data.tier?.price?.amount_pen !== undefined) {
     const packagePrice = Number(data.tier.package_price_pen);
     const unit = Number(data.tier.price.amount_pen);
     const totalPart = quantity ? ` El total es S/ ${formatPEN(quantity * packagePrice)}.` : '';
-    return `${label}Para ${data.quantity} paquetes, el precio aplicable es S/ ${packagePrice.toFixed(2)} por paquete (S/ ${unit.toFixed(2)} por botella).${totalPart}`;
-  }
-  if (data.price?.amount_pen !== undefined) {
+    sentence = `Para ${data.quantity} paquetes, el precio aplicable es S/ ${packagePrice.toFixed(2)} por paquete (S/ ${unit.toFixed(2)} por botella).${totalPart}`;
+  } else if (data.price?.amount_pen !== undefined) {
     const unit = Number(data.price.amount_pen);
     const per = data.price.per ?? 'unidad';
     const totalPart = quantity ? ` El total para ${data.quantity} ${pluralPer(per, data.quantity)} es S/ ${formatPEN(quantity * unit)}.` : '';
-    return `${label}El precio aplicable es S/ ${unit.toFixed(2)} por ${per}.${totalPart}`;
-  }
-  if (data.tier?.price?.amount_pen !== undefined) {
+    sentence = `El precio aplicable es S/ ${unit.toFixed(2)} por ${per}.${totalPart}`;
+  } else if (data.tier?.price?.amount_pen !== undefined) {
     const unit = Number(data.tier.price.amount_pen);
     const per = data.tier.price.per ?? 'unidad';
     const totalPart = quantity ? ` El total para ${data.quantity} ${pluralPer(per, data.quantity)} es S/ ${formatPEN(quantity * unit)}.` : '';
-    return `${label}Para la cantidad indicada, el precio aplicable es S/ ${unit.toFixed(2)} por ${per}.${totalPart}`;
+    sentence = `Para la cantidad indicada, el precio aplicable es S/ ${unit.toFixed(2)} por ${per}.${totalPart}`;
   }
-  return null;
+  if (!sentence) return null;
+
+  // Hechos adicionales autorizados que el modelo no puede alterar: contenido
+  // de paquete, mínimo vigente e inclusión/exclusión de etiqueta.
+  const facts = [sentence];
+  if (data.package?.contents) facts.push(`Cada paquete contiene ${data.package.contents} ${data.package.unit}.`);
+  if (data.minimum?.value) facts.push(`El pedido mínimo es de ${data.minimum.value} ${data.minimum.unit}.`);
+  if (data.label_included === true) facts.push('La etiqueta personalizada está incluida.');
+  else if (data.label_included === false && data.exclusions?.includes('etiqueta personalizada')) facts.push('No incluye etiqueta personalizada.');
+  return `${label}${facts.join(' ')}`;
 }
 
 function serviceFact(data) {
@@ -88,6 +96,17 @@ function composeCommercialFacts(tools, nameById = new Map()) {
       if (tool.resultStatus === 'ok' || tool.resultStatus === 'partial') {
         const fact = quoteFact(tool.result?.data, nameById.get(tool.args?.productId));
         if (fact) facts.push(fact);
+      } else if (tool.resultStatus === 'below_minimum') {
+        // Situación comercial: el pedido está bajo el mínimo vigente. Se
+        // explica con el mínimo autorizado (nunca lo decide el modelo).
+        const name = nameById.get(tool.args?.productId) ?? 'Ese producto';
+        const min = tool.result?.data?.minimum;
+        const packageInfo = tool.result?.data?.package;
+        const parts = [];
+        if (min?.value) parts.push(`el pedido mínimo vigente es de ${min.value} ${min.unit}`);
+        if (packageInfo?.contents) parts.push(`cada paquete contiene ${packageInfo.contents} ${packageInfo.unit}`);
+        const message = parts.length ? parts.join('; ') : 'el pedido está por debajo del mínimo vigente';
+        facts.push(`${name}: ${message}.`);
       } else if (tool.resultStatus === 'blocked' || tool.resultStatus === 'not_available') {
         // El cliente pidió un producto cuyo precio no es consultable o es
         // ambiguo: se explica en vez de omitirlo en silencio.
@@ -148,8 +167,9 @@ export class CommercialAgent {
       'Cuando la persona pide información de forma general o solo muestra interés (por ejemplo “quiero información”, “¿qué ofrecen?”, “cuéntame de ustedes”, “no conozco el servicio”), presenta de inmediato el panorama del negocio usando get_business_overview: las 3 rutas (maquila con tu propia marca, distribución de la marca Agua ReNew y compra directa) en una lista breve, e invita a elegir una. No te limites a preguntar “¿qué información buscas?” sin aportar nada.',
       'No eres un formulario: conserva el hilo, admite interrupciones y cambios de tema. Usa la memoria para entender el negocio, necesidad e interés. Puedes actualizarla solo con datos explícitos usando update_conversation_memory.',
       'Para cualquier hecho comercial, beneficio, precio, escala, mínimo, producto, delivery o servicio usa una herramienta de negocio aprobada. No inventes precios, promociones, descuentos, stock, rentabilidad, urgencia, crédito ni condiciones. Un resultado partial, input_required, blocked o not_available es una situación comercial para explicar, no un error técnico.',
-      'El sistema compone automáticamente los precios, totales y condiciones desde el resultado de las herramientas. Cuando uses get_quote o get_service_information, no escribas montos ni totales en tu respuesta: limítate a una transición breve y una sola pregunta de cierre; el precio y el total correctos se adjuntan solos.',
+      'El sistema compone automáticamente los precios, totales, mínimos, contenido de paquete e inclusión de etiqueta desde el resultado de las herramientas. Cuando uses get_quote o get_service_information, no escribas montos, totales, mínimos ni condiciones en tu respuesta: limítate a una transición breve y una sola pregunta de cierre; los hechos correctos se adjuntan solos. Un resultado below_minimum es una situación comercial: explica el mínimo vigente e invita a ajustar la cantidad, sin derivar por defecto.',
       'Solo recibes información ya autorizada. No reconstruyas ni infieras procesos internos, fabricación, equipamiento, químicos, proveedores, costos, márgenes, capacidad, datos de clientes o marcas maquiladas. Para solicitudes técnicas, confidenciales o formales usa get_information_boundary antes de responder; conserva una actitud comercial y ofrece un asesor cuando sea apropiado.',
+      'No afirmes condiciones de pago (adelantos, plazos, porcentajes) para pedidos de agua o maquila: no están documentadas. Si preguntan por forma de pago, consulta knowledge_lookup(“payment”); si indica que no está documentada, ofrece confirmación con un asesor. La condición de 50% de adelanto corresponde únicamente al servicio de creación de logotipo.',
       'Usa prepare_handoff cuando una persona esté lista para avanzar o exista posible negociación; usa request_human_handoff solo por negociación, cierre, condición especial/no documentada, bloqueo o solicitud explícita. Cuando derives, explica que el asesor recibirá el contexto para no empezar desde cero.',
       'No menciones datos “documentados”, herramientas, JSON, sistema, políticas internas ni fuentes. Ante un saludo o cortesía, responde con calidez e inmediatamente abre la conversación comercial (una pregunta de calificación o el panorama del negocio); no te quedes solo en el saludo.',
       `MEMORIA_COMPACTA=${JSON.stringify(memory)}`,

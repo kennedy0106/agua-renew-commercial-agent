@@ -1110,6 +1110,16 @@ export class ConversationEngine {
       await this.addBot('Para darte una información correcta necesito confirmar primero esa condición comercial. Si quieres, te derivo con un asesor.', [button('Hablar con un asesor', 'request_handoff')], 'handoff');
       return;
     }
+    if (result.status === 'below_minimum') {
+      // Situación comercial: pedido bajo el mínimo vigente; se explica y se
+      // vuelve a pedir cantidad sin derivar.
+      this.state.stage = 'await_quantity';
+      this.state.pendingField = 'quantity';
+      const min = result.data?.minimum;
+      const minimumText = min ? `El pedido mínimo vigente es de ${min.value} ${min.unit}.` : (result.message ?? 'El pedido está por debajo del mínimo vigente.');
+      await this.addBot(`${minimumText} ¿Con qué cantidad deseas cotizar?`);
+      return;
+    }
     if (result.status === 'invalid_input') {
       this.state.stage = 'await_quantity';
       await this.addBot(result.message);

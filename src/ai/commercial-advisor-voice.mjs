@@ -32,6 +32,10 @@ export class CommercialAdvisorVoice {
       lines.push(`El precio que corresponde es ${amount(data.price.amount_pen)} por ${data.price.per}.`);
       if (data.price.includes?.length) lines.push(`Incluye: ${data.price.includes.join(', ')}.`);
     }
+    if (data.package?.contents) lines.push(`Cada paquete contiene ${data.package.contents} ${data.package.unit}.`);
+    if (data.minimum?.value) lines.push(`Pedido mínimo vigente: ${data.minimum.value} ${data.minimum.unit}.`);
+    if (data.label_included === true) lines.push('La etiqueta personalizada está incluida.');
+    else if (data.label_included === false && data.exclusions?.includes('etiqueta personalizada')) lines.push('No incluye etiqueta personalizada.');
     if (data.collection) lines.push(data.collection);
     lines.push('Si quieres, también podemos revisar cómo cambia el precio con otra cantidad.');
     return lines.join('\n');

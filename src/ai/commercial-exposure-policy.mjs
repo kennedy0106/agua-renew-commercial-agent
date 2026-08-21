@@ -58,21 +58,39 @@ function productSummary(product, { includeContext = false } = {}) {
 }
 
 function safeProduct(product) {
+  const removed = [];
+  const inclusions = Array.isArray(product.inclusions)
+    ? withoutRestricted(copy(product.inclusions), removed)
+    : [];
   return {
     ...productSummary(product, { includeContext: true }),
     collection: product.collection ?? null,
     excludes: Array.isArray(product.excludes) ? copy(product.excludes) : [],
+    inclusions,
+    label_included: product.label_included ?? null,
+    purchase_types: Array.isArray(product.purchase_types) ? copy(product.purchase_types) : null,
+    restrictedDetailsRemoved: removed,
   };
 }
 
 function safeQuote(data) {
+  const removed = [];
+  const inclusions = Array.isArray(data.inclusions)
+    ? withoutRestricted(copy(data.inclusions), removed)
+    : [];
   return {
     product_id: data.product_id,
     modality: data.modality,
     price_type: data.price_type,
+    purchase_type: data.purchase_type ?? null,
     quantity: data.quantity ?? null,
     tier: data.tier ? copy(data.tier) : null,
     price: data.price ? copy(data.price) : null,
+    minimum: data.minimum ? copy(data.minimum) : null,
+    package: data.package ? copy(data.package) : null,
+    inclusions,
+    exclusions: Array.isArray(data.exclusions) ? copy(data.exclusions) : [],
+    label_included: data.label_included ?? null,
     fulfillment: data.fulfillment ?? null,
     collection: data.collection ?? null,
   };
@@ -144,7 +162,7 @@ export class CommercialExposurePolicy {
       audit.factsAllowed = ['id', 'description', 'products.summary'];
     } else if (toolName === 'get_product_information') {
       base.data = result.data ? safeProduct(result.data) : null;
-      audit.factsAllowed = ['id', 'name', 'modality', 'unit', 'package', 'minimum', 'collection', 'excludes'];
+      audit.factsAllowed = ['id', 'name', 'modality', 'unit', 'package', 'minimum', 'collection', 'excludes', 'inclusions', 'label_included', 'purchase_types'];
     } else if (toolName === 'get_service_information') {
       const data = result.data ?? {};
       base.data = {
@@ -162,7 +180,7 @@ export class CommercialExposurePolicy {
         if (result[key] !== undefined) base[key] = copy(result[key]);
       }
       audit.exposureLevel = LEVELS.CONTEXTUAL_COMMERCIAL;
-      audit.factsAllowed = ['product_id', 'quantity', 'applicable_price_or_tier', 'fulfillment_or_collection'];
+      audit.factsAllowed = ['product_id', 'quantity', 'applicable_price_or_tier', 'minimum', 'package', 'inclusions', 'exclusions', 'label_included', 'purchase_type', 'fulfillment_or_collection'];
     } else if (toolName === 'get_delivery_options') {
       const data = result.data ? withoutRestricted(result.data, audit.restrictedFieldsRemoved) : null;
       base.data = data;

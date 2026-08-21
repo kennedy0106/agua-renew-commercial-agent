@@ -1,0 +1,28 @@
+{
+  "schema_version": "1.0",
+  "title": "Agua ReNew — reglas comerciales vigentes",
+  "rule": "Capa independiente de la documentación fuente normalizada (agua_renew_commercial_data.json). Representa decisiones operativas vigentes de la empresa. Precedencia: REGLAS VIGENTES > DOCUMENTO NORMALIZADO. No elimina información histórica del documento fuente.",
+  "overrides": {
+    "maquila_bidon_20l": {
+      "public_minimum": { "value": 50, "unit": "unidades" },
+      "allow_30_unit_exception": false,
+      "note": "El documento fuente menciona una posible excepción de producción desde 30 unidades; por decisión comercial vigente NO se ofrece. El mínimo público vigente es 50 unidades."
+    }
+  },
+  "payment_policy": {
+    "maquila_general": {
+      "status": "not_documented",
+      "message": "No existe una forma de pago general documentada para pedidos de maquila; requiere confirmación humana.",
+      "do_not_reuse": ["Creación de logotipo profesional — Pack Básico"],
+      "note": "Las condiciones de pago documentadas para servicios adicionales no se aplican a pedidos de agua ni de maquila."
+    }
+  },
+  "label_policy": {
+    "maquila_botella_625ml_rosca": { "label_included": true, "note": "Etiqueta personalizada incluida." },
+    "maquila_botella_1l_fliptop": { "label_included": true, "note": "Etiqueta personalizada incluida." },
+    "maquila_bidon_20l": {
+      "refill_with_own_container": { "label_included": false, "note": "El precio de recarga (S/ 6.00) corresponde solo al servicio de recarga." },
+      "new_bidon_first_refill": { "label_included": false, "note": "El precio de S/ 19.00 del bidón nuevo + primera recarga NO incluye etiqueta personalizada." }
+    }
+  }
+}

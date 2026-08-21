@@ -46,13 +46,23 @@ test('PostgreSQL persiste conversación, mensajes, cotización y handoff', { ski
     assert.deepEqual(recovered.messages, completed.messages);
 
     await resumed.dispatch({ type: 'restart' });
+    // Pedido bajo el mínimo vigente: situación comercial explicada, sin handoff.
     await choose(resumed, 'select_family', 'bidon_20l');
     await choose(resumed, 'select_modality', 'maquila');
-    const handoff = await choose(resumed, 'submit_quantity', '30');
+    const belowMinimum = await choose(resumed, 'submit_quantity', '30');
+    assert.equal(belowMinimum.state.stage, 'await_quantity');
+    assert.equal(belowMinimum.state.handoffRequired, false);
+    assert.match(belowMinimum.messages.at(-1).text, /mínimo/);
+
+    // Bloqueo real (galonera de maquila): persiste handoff.
+    await resumed.dispatch({ type: 'restart' });
+    await choose(resumed, 'select_family', 'galonera_10_5l');
+    await choose(resumed, 'select_modality', 'maquila');
+    const handoff = await choose(resumed, 'submit_quantity', '50');
     const handoffs = await repository.listHumanHandoffs(handoff.conversationId);
     assert.equal(handoff.state.handoffRequired, true);
     assert.equal(handoffs.length, 1);
-    assert.deepEqual(handoffs[0].ambiguity_ids, ['maquila_20l_minimum']);
+    assert.deepEqual(handoffs[0].ambiguity_ids, ['maquila_galonera_scope']);
   } finally {
     await repository.close();
   }

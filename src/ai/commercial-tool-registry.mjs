@@ -27,7 +27,7 @@ export class CommercialToolRegistry {
       this.tool('get_delivery_options', 'Consulta delivery y recojo autorizados.', object({ modality: { type: 'string', enum: MODALITIES }, district: string }, ['modality'])),
       this.tool('get_additional_services_overview', 'Lista servicios adicionales aprobados (solo nombres; no incluye precios).', object({})),
       this.tool('get_service_information', 'Obtiene detalles y precio de un servicio adicional aprobado.', object({ serviceName: { type: 'string', enum: serviceNames }, topic: string }, ['serviceName'])),
-      this.tool('knowledge_lookup', 'Consulta información textual aprobada de un tema.', object({ topic: { type: 'string', enum: ['maquila', 'distribution', 'brand_registration', 'labels', 'logo', 'sample', 'invoice', 'collection', 'product_info'] } }, ['topic'])),
+      this.tool('knowledge_lookup', 'Consulta información textual aprobada de un tema.', object({ topic: { type: 'string', enum: ['maquila', 'distribution', 'brand_registration', 'labels', 'logo', 'sample', 'invoice', 'collection', 'product_info', 'payment'] } }, ['topic'])),
       this.tool('get_information_boundary', 'Responde de manera segura ante una solicitud técnica, confidencial o formal.', object({ category: { type: 'string', enum: ['technical_information_request', 'confidential_information_request', 'formal_business_request', 'negotiation', 'commercial_exception'] } }, ['category'])),
       this.tool('update_conversation_memory', 'Guarda solo contexto explícito del prospecto.', object({ businessType: string, customerGoal: string, experienceLevel: string, commercialIntent: string, modality: { type: 'string', enum: MODALITIES }, productId: string, quantity: { type: 'integer', minimum: 1 }, district: string, hasBrand: bool, needsDesign: bool, sampleInterest: bool, purchaseReadiness: { type: 'string', enum: READINESS }, pendingTopic: string, questionsResolved: { type: 'array', items: string } })),
       this.tool('prepare_handoff', 'Prepara el resumen para un asesor humano, sin derivar todavía.', object({ reason: string, pendingQuestion: string })),
@@ -145,6 +145,7 @@ export class CommercialToolRegistry {
       brand_registration: byName('Registro de marca'), labels: byName('Etiquetas personalizadas'), logo: byName('Creación de logotipo profesional — Pack Básico'),
       sample: byName('Muestra gratuita'), invoice: this.knowledge.faq?.find((item) => /factura/i.test(JSON.stringify(item))) ?? null,
       collection: this.knowledge.delivery_and_collection, product_info: this.knowledge.documented_product_claims,
+      payment: this.commercialService.get_payment_policy()?.data ?? null,
     };
     return map[topic] ? { status: 'ok', data: clone(map[topic]) } : { status: 'not_found', message: 'Tema aprobado no disponible.' };
   }

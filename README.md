@@ -103,3 +103,22 @@ RUN_DEEPSEEK_TESTS=1 node --test test/deepseek.integration.test.mjs
 - `knowledge/`: fuente estructurada de datos comerciales (autoridad del runtime).
 
 Si `CommercialService` devuelve una condición bloqueada o requiere cotización, `ConversationEngine` persiste el handoff y muestra la derivación a un asesor. La UI solo presenta eventos, estados y datos recibidos.
+
+## Fuente documental vs. reglas vigentes
+
+El conocimiento comercial se divide en dos capas con precedencia explícita:
+
+- `knowledge/agua_renew_commercial_data.json` — **documentación fuente normalizada** (Speech maquila y Precios Agua ReNew). No representa decisiones operativas posteriores.
+- `knowledge/commercial_overrides.json` — **reglas comerciales vigentes**: decisiones actuales de la empresa. Precedencia: **REGLAS VIGENTES > DOCUMENTO NORMALIZADO**.
+
+Ejemplo: el documento fuente menciona una posible excepción de maquila de bidones 20 L desde 30 unidades; la regla vigente (`maquila_bidon_20l.public_minimum = 50`, `allow_30_unit_exception = false`) establece que el mínimo público es **50 unidades** y la excepción no se ofrece. El dato histórico permanece en la fuente; la regla vigente controla la oferta pública.
+
+## Hechos que controla el sistema (nunca el LLM)
+
+El modelo interpreta al usuario, selecciona herramientas y redacta lenguaje; **jamás decide** precios, mínimos, contenido de paquete, escalas, inclusiones/exclusiones, etiqueta, forma de pago, condiciones de recojo/delivery ni excepciones comerciales. Esos hechos provienen de:
+
+- `CommercialService` (autoridad comercial, con overrides aplicados);
+- `get_quote` (devuelve precio, total, mínimo, paquete, inclusiones, exclusiones, `label_included` y `purchase_type`);
+- la composición determinística (`composeCommercialFacts`) que adjunta los hechos a la respuesta del agente.
+
+Un pedido bajo el mínimo se responde como situación comercial (`below_minimum`): se explica el mínimo vigente y se invita a ajustar la cantidad, sin derivar por defecto ni inventar precios.

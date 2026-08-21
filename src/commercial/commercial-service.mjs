@@ -4,22 +4,21 @@ import { fileURLToPath } from 'node:url';
 const KNOWLEDGE_FILE = fileURLToPath(
   new URL('../../knowledge/agua_renew_commercial_data.json', import.meta.url),
 );
+const OVERRIDES_FILE = fileURLToPath(
+  new URL('../../knowledge/commercial_overrides.json', import.meta.url),
+);
 
 const HANDOFF_MESSAGE =
   'Para confirmarlo correctamente, te derivaré con un asesor.';
 
 const AMBIGUITY_RULES = {
-  maquila_20l_minimum: (context) =>
-    context.operation === 'purchase_price' &&
-    context.productId === 'maquila_bidon_20l' &&
-    Number.isFinite(context.quantity) && context.quantity < 50,
+  // NOTA: 'maquila_20l_minimum' y 'bidon_new_maquila_price_components' fueron
+  // superadas por las reglas vigentes en knowledge/commercial_overrides.json
+  // (mínimo público 50, sin excepción de 30; S/ 19 consultable). La
+  // documentación histórica se conserva en el JSON fuente, pero ya no bloquea.
   maquila_label_offer_vs_cost: (context) =>
     context.modality === 'maquila' &&
     (context.topic === 'first_order_labels' || context.withPersonalizedLabels === true),
-  bidon_new_maquila_price_components: (context) =>
-    context.operation === 'purchase_price' &&
-    context.productId === 'maquila_bidon_20l' &&
-    context.purchaseType === 'new_bidon_first_refill',
   public_suggested_prices: (context) =>
     context.operation === 'suggested_resale_price' &&
     ['Recarga de bidón de 20 L', 'Botella de 1 L'].includes(context.productName),
@@ -103,8 +102,9 @@ function findTier(tiers, quantity) {
  * The constructor accepts data only to make tests and future persistence adapters simple.
  */
 export class CommercialService {
-  constructor(data = JSON.parse(readFileSync(KNOWLEDGE_FILE, 'utf8'))) {
+  constructor(data = JSON.parse(readFileSync(KNOWLEDGE_FILE, 'utf8')), overrides = JSON.parse(readFileSync(OVERRIDES_FILE, 'utf8'))) {
     this.data = copy(data);
+    this.overrides = copy(overrides);
     this.productsById = new Map();
 
     for (const [modality, products] of Object.entries(this.data.products)) {
@@ -112,6 +112,45 @@ export class CommercialService {
         this.productsById.set(product.id, { ...product, modality });
       }
     }
+
+    this.applyVigentOverrides();
+  }
+
+  /** Aplica las reglas comerciales vigentes sobre los productos en memoria:
+   * el override prevalece sobre el documento normalizado. */
+  applyVigentOverrides() {
+    const rules = this.overrides.overrides ?? {};
+    const labels = this.overrides.label_policy ?? {};
+    for (const [productId, product] of this.productsById) {
+      const rule = rules[productId];
+      if (rule?.public_minimum) product.minimum = copy(rule.public_minimum);
+      const labelRule = labels[productId];
+      if (labelRule && typeof labelRule.label_included === 'boolean' && !product.prices) {
+        product.label_included = labelRule.label_included;
+      }
+    }
+    // El bidón de 20 L tiene reglas por tipo de compra; expone el hecho público
+    // dominante (etiqueta no incluida) y los tipos de compra consultables.
+    const bidon = this.productsById.get('maquila_bidon_20l');
+    if (bidon) {
+      bidon.purchase_types = ['refill_with_own_container', 'new_bidon_first_refill'];
+      bidon.label_included = this.labelIncluded('maquila_bidon_20l', 'new_bidon_first_refill');
+    }
+  }
+
+  labelIncluded(productId, purchaseType = null) {
+    const labelRule = this.overrides.label_policy?.[productId];
+    if (!labelRule) return null;
+    if (purchaseType && typeof labelRule[purchaseType]?.label_included === 'boolean') {
+      return labelRule[purchaseType].label_included;
+    }
+    if (typeof labelRule.label_included === 'boolean') return labelRule.label_included;
+    return null;
+  }
+
+  get_payment_policy() {
+    const policy = this.overrides.payment_policy ?? {};
+    return success(policy);
   }
 
   check_ambiguities(context = {}) {
@@ -218,10 +257,6 @@ export class CommercialService {
       return invalidQuantity(quantity);
     }
 
-    if (productId === 'maquila_bidon_20l' && quantity === undefined) {
-      return { status: 'input_required', required: ['quantity'] };
-    }
-
     const ambiguityCheck = this.check_ambiguities({
       operation: 'purchase_price',
       modality: product.modality,
@@ -233,16 +268,58 @@ export class CommercialService {
     });
     if (ambiguityCheck.blocked) return blocked(ambiguityCheck.ambiguities);
 
+    // Mínimo vigente: el override prevalece sobre el documento. Un pedido por
+    // debajo del mínimo es una situación comercial explicable (below_minimum),
+    // no un error técnico ni una ambigüedad.
+    const minimum = product.minimum ?? null;
+    if (minimum && Number.isFinite(quantity) && quantity < minimum.value) {
+      return {
+        status: 'below_minimum',
+        data: {
+          product_id: productId,
+          modality: product.modality,
+          quantity,
+          minimum: copy(minimum),
+          package: product.package ? copy(product.package) : null,
+          label_included: this.labelIncluded(productId, purchaseType),
+        },
+        message: `El pedido mínimo vigente es de ${minimum.value} ${minimum.unit}.`,
+      };
+    }
+
     if (productId === 'maquila_bidon_20l') {
-      if (purchaseType !== 'refill_with_own_container') {
+      if (!Number.isFinite(quantity)) {
+        return { status: 'input_required', required: ['quantity'] };
+      }
+      if (purchaseType !== 'refill_with_own_container' && purchaseType !== 'new_bidon_first_refill') {
         return {
           status: 'input_required',
           required: ['purchaseType'],
           allowed_purchase_types: ['refill_with_own_container', 'new_bidon_first_refill'],
         };
       }
-      if (!Number.isFinite(quantity)) {
-        return { status: 'input_required', required: ['quantity'] };
+
+      if (purchaseType === 'new_bidon_first_refill') {
+        // Bidón nuevo (envase + primera recarga): precio documentado S/ 19,
+        // consultable cuando todos los datos requeridos están presentes.
+        const newBidon = product.prices.find((entry) => entry.scope?.includes('bidón nuevo'));
+        if (newBidon?.price) {
+          return success({
+            product_id: productId,
+            modality: product.modality,
+            price_type: 'purchase',
+            purchase_type: 'new_bidon_first_refill',
+            quantity,
+            price: { ...copy(newBidon.price) },
+            minimum: copy(minimum),
+            inclusions: ['envase', 'primera recarga'],
+            exclusions: Array.isArray(newBidon.excludes) ? copy(newBidon.excludes) : [],
+            label_included: this.labelIncluded(productId, 'new_bidon_first_refill'),
+            fulfillment: 'plant_collection',
+            collection: 'recojo en planta',
+          });
+        }
+        return { status: 'not_available', message: 'No hay un precio documentado para el bidón nuevo de maquila.' };
       }
 
       if (quantity > 400 && fulfillment === 'authorized_collection_point') {
@@ -271,10 +348,12 @@ export class CommercialService {
             product_id: productId,
             modality: product.modality,
             price_type: 'purchase',
+            purchase_type: 'refill_with_own_container',
             quantity,
             tier,
+            minimum: copy(minimum),
+            label_included: this.labelIncluded(productId, 'refill_with_own_container'),
             fulfillment: fulfillment ?? 'plant_collection_or_authorized_collection_point',
-            source: product.prices[1].source,
           })
         : { status: 'input_required', required: ['quantity'] };
     }
@@ -289,9 +368,15 @@ export class CommercialService {
             product_id: productId,
             modality: product.modality,
             price_type: 'purchase',
+            purchase_type: purchaseType ?? null,
             quantity,
             tier,
-            source: product.source,
+            minimum: minimum ? copy(minimum) : null,
+            package: product.package ? copy(product.package) : null,
+            inclusions: Array.isArray(product.inclusions) ? copy(product.inclusions) : [],
+            exclusions: Array.isArray(product.excludes) ? copy(product.excludes) : [],
+            label_included: this.labelIncluded(productId, purchaseType),
+            collection: product.collection ?? null,
           })
         : { status: 'not_available', message: 'La cantidad está fuera de las escalas documentadas.' };
     }
@@ -301,10 +386,13 @@ export class CommercialService {
         product_id: productId,
         modality: product.modality,
         price_type: 'purchase',
+        purchase_type: purchaseType ?? null,
         quantity: quantity ?? null,
         price: product.price,
+        minimum: minimum ? copy(minimum) : null,
+        inclusions: Array.isArray(product.inclusions) ? copy(product.inclusions) : [],
+        exclusions: Array.isArray(product.excludes) ? copy(product.excludes) : [],
         collection: product.collection ?? null,
-        source: product.source,
       });
     }
 

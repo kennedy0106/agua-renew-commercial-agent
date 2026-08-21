@@ -40,14 +40,16 @@ test('IA obtiene precio exclusivamente desde CommercialService para 40 paquetes 
   assert.equal(repository.aiUsageLogs.at(-1).success, true);
 });
 
-test('IA bloquea maquila de 30 bidones mediante CommercialService y persiste handoff', async () => {
+test('IA trata 30 bidones de maquila como pedido bajo el mínimo vigente, sin handoff', async () => {
   const { engine, repository } = await createAIEngine([structured({
     modality: 'maquila', product_id: 'maquila_bidon_20l', quantity: 30,
   })]);
   const result = await engine.dispatch({ type: 'submit_text', value: 'Quiero maquilar 30 bidones' });
-  assert.equal(result.state.stage, 'handoff');
-  assert.equal(result.state.handoffRequired, true);
-  assert.deepEqual(repository.humanHandoffs[0].ambiguityIds, ['maquila_20l_minimum']);
+  assert.notEqual(result.state.stage, 'handoff');
+  assert.equal(result.state.handoffRequired, false);
+  assert.equal(repository.humanHandoffs.length, 0);
+  assert.match(result.messages.at(-1).text, /mínimo/);
+  assert.match(result.messages.at(-1).text, /50/);
 });
 
 test('IA conserva producto y modalidad conocidos y pregunta únicamente cantidad', async () => {

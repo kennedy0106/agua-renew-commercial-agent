@@ -49,15 +49,28 @@ test('convierte input_required en solicitud de cantidad', async () => {
 
 test('muestra derivación visual y persiste handoff cuando CommercialService bloquea', async () => {
   const { engine, repository } = await createEngine();
-  await choose(engine, 'select_family', 'bidon_20l');
+  await choose(engine, 'select_family', 'galonera_10_5l');
   await choose(engine, 'select_modality', 'maquila');
-  const result = await choose(engine, 'submit_quantity', '30');
+  const result = await choose(engine, 'submit_quantity', '50');
 
   assert.equal(result.state.stage, 'handoff');
   assert.equal(result.state.handoffRequired, true);
   assert.equal(result.messages.at(-1).kind, 'handoff');
   assert.equal(repository.humanHandoffs.length, 1);
-  assert.deepEqual(repository.humanHandoffs[0].ambiguityIds, ['maquila_20l_minimum']);
+  assert.deepEqual(repository.humanHandoffs[0].ambiguityIds, ['maquila_galonera_scope']);
+});
+
+test('maquila de 30 bidones explica el mínimo vigente (50) y vuelve a pedir cantidad sin derivar', async () => {
+  const { engine, repository } = await createEngine();
+  await choose(engine, 'select_family', 'bidon_20l');
+  await choose(engine, 'select_modality', 'maquila');
+  const result = await choose(engine, 'submit_quantity', '30');
+
+  assert.equal(result.state.stage, 'await_quantity');
+  assert.equal(result.state.handoffRequired, false);
+  assert.equal(repository.humanHandoffs.length, 0);
+  assert.match(result.messages.at(-1).text, /mínimo/);
+  assert.match(result.messages.at(-1).text, /50/);
 });
 
 test('permite cambiar a recojo en planta después de una escala de más de 400 recargas', async () => {

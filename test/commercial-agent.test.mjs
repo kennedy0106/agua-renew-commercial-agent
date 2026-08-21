@@ -47,7 +47,7 @@ test('ConversationEngine agent persiste handoff cuando una herramienta devuelve 
   const repository = new InMemoryConversationRepository();
   const service = new CommercialService();
   const provider = scriptedProvider([
-    { content: null, toolCalls: [toolCall('get_quote', { productId: 'maquila_bidon_20l', quantity: 30, purchaseType: 'refill_with_own_container' })] },
+    { content: null, toolCalls: [toolCall('get_quote', { productId: 'maquila_galonera_10_5l', quantity: 50 })] },
     { content: 'Para confirmarlo bien, te pondré en contacto con un asesor.' },
   ]);
   const engine = new ConversationEngine({
@@ -55,7 +55,7 @@ test('ConversationEngine agent persiste handoff cuando una herramienta devuelve 
     commercialAgent: new CommercialAgent({ provider, tools: new CommercialToolRegistry({ commercialService: service }) }),
   });
   await engine.initialize({ customerExternalId: 'agent-handoff', channel: 'local', mode: 'ai' });
-  const snapshot = await engine.dispatch({ type: 'submit_text', value: 'Quiero maquilar 30 bidones' });
+  const snapshot = await engine.dispatch({ type: 'submit_text', value: 'Quiero cotizar galoneras de maquila' });
   assert.equal(snapshot.state.handoffRequired, true);
   assert.equal((await repository.listHumanHandoffs(snapshot.conversationId)).length, 1);
 });
@@ -239,4 +239,55 @@ test('ConversationEngine persiste la categoría de handoff de una herramienta', 
   const snapshot = await engine.dispatch({ type: 'submit_text', value: 'Necesito una condición especial' });
   const handoff = (await repository.listHumanHandoffs(snapshot.conversationId))[0];
   assert.equal(handoff.category, 'commercial_exception');
+});
+
+// ── BLOQUE A · FASE 2: cotización completa, exposición y composición ──
+
+test('CASO 9: la política de exposición sigue eliminando source, técnico, costos y proveedores', () => {
+  const registry = new CommercialToolRegistry({ commercialService: new CommercialService() });
+  const quote = registry.executeForAgent('get_quote', { productId: 'maquila_botella_1l_fliptop', quantity: 30 });
+  const quoteJson = JSON.stringify(quote.result);
+  assert.equal(quoteJson.includes('source'), false);
+  assert.equal(quoteJson.includes('Ósmosis'), false);
+  assert.equal(quoteJson.includes('ozono'), false);
+  assert.equal(quoteJson.includes('margen'), false);
+  assert.equal(quoteJson.includes('proveedor'), false);
+  assert.equal(quote.result.data.minimum.value, 20);
+  assert.equal(quote.result.data.package.contents, 10);
+  assert.equal(quote.result.data.label_included, true);
+  assert.ok(quote.result.data.inclusions.every((item) => !/ósmosis|ozono|uv/i.test(item)));
+
+  const product = registry.executeForAgent('get_product_information', { productId: 'maquila_botella_1l_fliptop' });
+  const productJson = JSON.stringify(product.result);
+  assert.equal(productJson.includes('tiers'), false);
+  assert.equal(productJson.includes('source'), false);
+  assert.equal(productJson.includes('Ósmosis'), false);
+  assert.equal(product.result.data.label_included, true);
+});
+
+test('CASO 10: composeCommercialFacts incorpora mínimo, paquete y etiqueta desde get_quote', async () => {
+  const provider = scriptedProvider([
+    { content: null, toolCalls: [toolCall('get_quote', { productId: 'maquila_botella_625ml_rosca', quantity: 20 })] },
+    { content: '¿Te gustaría que revisemos otra presentación?' },
+  ]);
+  const result = await new CommercialAgent({ provider, tools: new CommercialToolRegistry({ commercialService: new CommercialService() }) })
+    .reply({ message: 'Quiero 20 paquetes de 625 ml con mi marca', state: {}, history: [] });
+  assert.match(result.text, /S\/ 12\.00 por paquete/);
+  assert.match(result.text, /Cada paquete contiene 15 botellas/);
+  assert.match(result.text, /El pedido mínimo es de 20 paquetes/);
+  assert.match(result.text, /La etiqueta personalizada está incluida/);
+  assert.equal(result.metrics.quoteResponseComposedLocally, true);
+});
+
+test('un pedido bajo el mínimo se compone como situación comercial sin handoff', async () => {
+  const provider = scriptedProvider([
+    { content: null, toolCalls: [toolCall('get_quote', { productId: 'maquila_botella_625ml_rosca', quantity: 5 })] },
+    { content: '¿Te gustaría ajustar la cantidad?' },
+  ]);
+  const result = await new CommercialAgent({ provider, tools: new CommercialToolRegistry({ commercialService: new CommercialService() }) })
+    .reply({ message: 'Quiero 5 paquetes de 625 ml', state: {}, history: [] });
+  assert.equal(result.handoff, null);
+  assert.match(result.text, /pedido mínimo vigente es de 20 paquetes/);
+  assert.match(result.text, /cada paquete contiene 15 botellas/);
+  assert.equal(result.metrics.toolResultGroundingAdded, true);
 });
