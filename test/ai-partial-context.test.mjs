@@ -63,14 +63,14 @@ test('el plan puede solicitar precio, pero CommercialService produce el resultad
   })]);
   const result = await engine.dispatch({ type: 'submit_text', value: 'si llevo más cantidad sale mejor?' });
   assert.equal(provider.requests.length, 1);
-  assert.match(result.messages.at(-1).text, /te corresponde/i);
+  assert.match(result.messages.at(-1).text, /le corresponde/i);
   assert.match(result.messages.at(-1).text, /S\/ 1\.30/);
 });
 
 test('un fallo técnico no intenta sustituir DeepSeek con reglas semánticas locales', async () => {
   const { engine, repository } = await createEngine([new Error('timeout')]);
   const result = await engine.dispatch({ type: 'submit_text', value: 'yo quiero comprarles para luego vender' });
-  assert.match(result.messages.at(-1).text, /no pude procesar tu consulta/i);
+  assert.match(result.messages.at(-1).text, /no pude procesar su consulta/i);
   assert.equal(result.state.modality, null);
   assert.equal(repository.turnMetrics.at(-1).resolution, 'deepseek');
   assert.equal(repository.turnMetrics.at(-1).technicalFallback, true);

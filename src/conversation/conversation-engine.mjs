@@ -16,7 +16,7 @@ function button(label, type, value) {
 
 function initialState(mode = 'deterministic') {
   return {
-    stage: 'choose_family', family: null, modality: null, productId: null,
+    stage: 'choose_family', family: null, modality: null, productId: null, channel: null,
     quantity: null, purchaseType: null, fulfillment: null, handoffRequired: false,
     handoffRecorded: false, quoteRequestCreated: false, pendingField: null, pendingAction: null,
     district: null, businessType: null, customerGoal: null, useCase: null, experienceLevel: null, commercialIntent: null,
@@ -163,6 +163,7 @@ export class ConversationEngine {
     if (existing) {
       this.conversation = existing;
       this.state = { ...initialState(), ...existing.state };
+      this.state.channel = channel;
       this.lastMessageAt = existing.lastMessageAt;
       this.messages = (await this.repository.listMessages(existing.id)).map((message) => ({
         role: message.direction === 'inbound' ? 'user' : 'bot',
@@ -175,6 +176,7 @@ export class ConversationEngine {
     }
 
     this.state = initialState(mode === 'ai' ? 'ai' : 'deterministic');
+    this.state.channel = channel;
     this.messages = [];
     this.lastMessageAt = new Date().toISOString();
     this.conversation = await this.repository.createConversation({
@@ -210,9 +212,9 @@ export class ConversationEngine {
       } else if (event.type === 'set_mode') {
         this.state.mode = event.value === 'ai' ? 'ai' : 'deterministic';
         await this.addBot(this.state.mode === 'ai'
-          ? 'Modo DeepSeek IA activado. Escribe lo que necesitas; las sugerencias son opcionales. La información comercial seguirá siendo validada por el sistema.'
+          ? 'Modo DeepSeek IA activado. Escriba lo que necesita; las sugerencias son opcionales. La información comercial seguirá siendo validada por el sistema.'
           : 'Modo determinístico activado. Puedes continuar con botones y campos validados.');
-        if (this.state.mode === 'ai') await this.addBot('¿Cómo puedo ayudarte?', this.aiWelcomeOptions());
+        if (this.state.mode === 'ai') await this.addBot('¿Cómo puedo ayudarle?', this.aiWelcomeOptions());
       } else {
         switch (event.type) {
           case 'select_family': await this.selectFamily(event.value); break;
@@ -280,7 +282,7 @@ export class ConversationEngine {
       return result.status === 'ok' ? [button(result.data.name, 'select_modality', modality)] : [];
     });
     this.state.stage = 'choose_modality';
-    await this.addBot('¿Cómo deseas comercializar este producto?', options);
+    await this.addBot('¿Cómo desea comercializar este producto?', options);
   }
 
   async selectModality(modality) {
@@ -302,7 +304,7 @@ export class ConversationEngine {
     await this.addUser(modalityResult.data.name);
     if (products.length === 1) return this.selectProduct(products[0].id, { silent: true });
     this.state.stage = 'choose_product';
-    await this.addBot('Selecciona la presentación exacta.', products.map((product) => button(product.name, 'select_product', product.id)));
+    await this.addBot('Seleccione la presentación exacta.', products.map((product) => button(product.name, 'select_product', product.id)));
   }
 
   async selectProduct(productId, { silent = false } = {}) {
@@ -327,7 +329,7 @@ export class ConversationEngine {
       await this.addBot(
         this.state.mode === 'ai'
           ? `Claro. ${this.quantityQuestion(product)}`
-          : 'Indica la cantidad que deseas consultar.',
+          : 'Indique la cantidad que desea consultar.',
       );
       return;
     }
@@ -552,7 +554,7 @@ export class ConversationEngine {
       return;
     }
     if (this.state.stage === 'complete') {
-      await this.addBot('Perfecto. Si necesitas revisar otra cantidad o presentación, dime y lo vemos.');
+      await this.addBot('Perfecto. Si necesita revisar otra cantidad o presentación, dígame y lo vemos.');
       return;
     }
     await this.addBot(this.advisorVoice.acknowledge());
@@ -606,7 +608,7 @@ export class ConversationEngine {
     this.markDialogueAct('clarify');
     if (this.turnMetric) this.turnMetric.clarificationRequired = true;
     this.setAssistantContext({ act: 'clarify', topic: this.state.lastTopic, offeredOptions: [] });
-    await this.addBot('¿Quieres que te explique cómo funciona o prefieres revisar productos y precios?');
+    await this.addBot('¿Desea que le explique cómo funciona o prefiere revisar productos y precios?');
   }
 
   resolvePendingConfirmation(text) {
@@ -677,7 +679,7 @@ export class ConversationEngine {
   }
 
   async fallbackFromAI(_text, _reason) {
-    await this.addBot('En este momento no pude procesar tu consulta con normalidad. Si quieres, puedes contarme qué producto buscas o pedir hablar con un asesor.', this.aiWelcomeOptions());
+    await this.addBot('En este momento no pude procesar su consulta con normalidad. Si desea, puede contarme qué producto busca o pedir hablar con un asesor.', this.aiWelcomeOptions());
   }
 
   async applyAIInterpretation(interpretation) {
@@ -721,7 +723,7 @@ export class ConversationEngine {
     if (interpretation.intent === 'list_products') {
       const result = this.commercialService.list_products({ modality: interpretation.modality ?? undefined });
       if (result.status === 'ok') await this.addBot(this.responseComposer.composeProducts(result.data));
-      else await this.addBot('Selecciona una modalidad para consultar las presentaciones disponibles.', this.familyOptions());
+      else await this.addBot('Seleccione una modalidad para consultar las presentaciones disponibles.', this.familyOptions());
       return;
     }
     if (interpretation.intent === 'information_request') return this.respondToInformationRequest(interpretation);
@@ -736,7 +738,7 @@ export class ConversationEngine {
           const products = this.commercialService.list_products({ modality: interpretation.modality });
           this.state.pendingField = 'product';
           this.state.stage = 'choose_product';
-          await this.addBot(`${this.advisorVoice.modalityExplanation(interpretation.modality, modality.data)}\n\nSi quieres, también puedo ayudarte a revisar qué presentación te conviene para empezar. ¿Cuál tienes en mente?`, products.status === 'ok'
+          await this.addBot(`${this.advisorVoice.modalityExplanation(interpretation.modality, modality.data)}\n\nSi desea, también puedo ayudarle a revisar qué presentación le conviene para empezar. ¿Cuál tiene en mente?`, products.status === 'ok'
             ? products.data.map((product) => button(product.name, 'select_product', product.id))
             : []);
           return;
@@ -757,7 +759,7 @@ export class ConversationEngine {
     if (interpretation.intent === 'additional_service') {
       if (!interpretation.additionalServiceName) {
         const services = this.commercialService.list_additional_services();
-        await this.addBot('Indica el servicio adicional que deseas consultar.', services.data.map((service) => button(service.name, 'submit_text', service.name)));
+        await this.addBot('Indique el servicio adicional que desea consultar.', services.data.map((service) => button(service.name, 'submit_text', service.name)));
         return;
       }
       const result = this.commercialService.get_additional_service(interpretation.additionalServiceName);
@@ -897,7 +899,7 @@ export class ConversationEngine {
         ? this.advisorVoice.maquilaRecognition(modalityResult.data)
         : modality === 'final_customer'
           ? this.advisorVoice.directPurchaseRecognition(products.data)
-        : `${this.advisorVoice.modalityExplanation(modality, modalityResult.data)}\n\n¿Qué presentación te interesa revisar?`;
+        : `${this.advisorVoice.modalityExplanation(modality, modalityResult.data)}\n\n¿Qué presentación le interesa revisar?`;
     await this.addBot(intro, products.data.map((product) => button(product.name, 'select_product', product.id)));
   }
 
@@ -910,13 +912,13 @@ export class ConversationEngine {
   async respondToConversationalUnknown() {
     this.markDialogueAct('unknown');
     this.setAssistantContext({ act: 'unknown', topic: this.state.lastTopic, offeredOptions: [] });
-    await this.addBot(`No llegué a entenderte bien. ${this.advisorVoice.askMoreContext()}`);
+    await this.addBot(`No llegué a entenderle bien. ${this.advisorVoice.askMoreContext()}`);
   }
 
   async respondToSlotUpdate(interpretation) {
     if (interpretation.productId || interpretation.quantity !== null) return this.applyAIQuote(interpretation);
     if (this.state.modality) {
-      await this.addBot('¿Quieres conocer cómo funciona esta modalidad o prefieres revisar productos y precios?', this.modalityActionOptions());
+      await this.addBot('¿Desea conocer cómo funciona esta modalidad o prefiere revisar productos y precios?', this.modalityActionOptions());
       return;
     }
     await this.addBot(this.advisorVoice.askModality(), this.modalityOptions());
@@ -997,11 +999,11 @@ export class ConversationEngine {
       this.state.stage = 'choose_product';
       this.state.pendingField = 'product';
       const introduction = modality === 'distribution_agua_renew'
-        ? 'Perfecto, entonces estás buscando comercializar productos de Agua ReNew. 💧'
+        ? 'Perfecto, entonces está buscando comercializar productos de Agua ReNew. 💧'
         : modality === 'maquila'
-          ? 'Perfecto, podemos revisar una opción con tu propia marca. 💧'
+          ? 'Perfecto, podemos revisar una opción con su propia marca. 💧'
           : 'Perfecto. ';
-      await this.addBot(`${introduction}\n¿Qué presentación te interesa?`, products.status === 'ok'
+      await this.addBot(`${introduction}\n¿Qué presentación le interesa?`, products.status === 'ok'
         ? products.data.map((product) => button(product.name, 'select_product', product.id))
         : this.familyOptions());
       return;
@@ -1074,7 +1076,7 @@ export class ConversationEngine {
   }
 
   quantityQuestion(product) {
-    return product.package ? '¿Cuántos paquetes necesitas?' : '¿Cuántas unidades necesitas?';
+    return product.package ? '¿Cuántos paquetes necesita?' : '¿Cuántas unidades necesita?';
   }
 
   async recordAIUsage({ provider = null, model = null, latencyMs = null, inputTokens = null, outputTokens = null, intent = null, operation = null, success, fallbackUsed, errorType = null, rawResponse = null, parsedResponse = null, parserRejection = null, fallbackReason = null }) {
@@ -1114,7 +1116,7 @@ export class ConversationEngine {
       if (result.required.includes('quantity')) {
         this.state.stage = 'await_quantity';
         this.state.pendingField = 'quantity';
-        await this.addBot('Entiendo. ¿Aproximadamente cuántos paquetes necesitas?');
+        await this.addBot('Entiendo. ¿Aproximadamente cuántos paquetes necesita?');
       } else if (result.required.includes('purchaseType')) {
         this.state.stage = 'await_purchase_type';
         this.state.pendingField = 'purchaseType';
@@ -1140,7 +1142,7 @@ export class ConversationEngine {
       this.state.stage = 'handoff';
       this.state.salesStage = 'handoff';
       this.state.handoffRequired = true;
-      await this.addBot('Para darte una información correcta necesito confirmar primero esa condición comercial. Si quieres, te derivo con un asesor.', [button('Hablar con un asesor', 'request_handoff')], 'handoff');
+      await this.addBot('Para darte una información correcta necesito confirmar primero esa condición comercial. Si desea, lo derivo con un asesor.', [button('Hablar con un asesor', 'request_handoff')], 'handoff');
       return;
     }
     if (result.status === 'below_minimum') {
@@ -1150,7 +1152,7 @@ export class ConversationEngine {
       this.state.pendingField = 'quantity';
       const min = result.data?.minimum;
       const minimumText = min ? `El pedido mínimo vigente es de ${min.value} ${min.unit}.` : (result.message ?? 'El pedido está por debajo del mínimo vigente.');
-      await this.addBot(`${minimumText} ¿Con qué cantidad deseas cotizar?`);
+      await this.addBot(`${minimumText} ¿Con qué cantidad desea cotizar?`);
       return;
     }
     if (result.status === 'invalid_input') {
@@ -1175,10 +1177,10 @@ export class ConversationEngine {
 
   async seedWelcomeMessage() {
     if (this.state.mode === 'ai') {
-      await this.addBot('¡Hola! 👋 Gracias por escribir a Agua ReNew. Cuéntame, ¿qué estás buscando?', this.aiWelcomeOptions());
+      await this.addBot('¡Hola! 👋 Gracias por escribir a Agua ReNew. Cuénteme, ¿qué está buscando?', this.aiWelcomeOptions());
       return;
     }
-    await this.addBot('Hola. Selecciona la presentación que deseas consultar.', this.familyOptions());
+    await this.addBot('Hola. Seleccione la presentación que desea consultar.', this.familyOptions());
   }
 
   async persistState() {

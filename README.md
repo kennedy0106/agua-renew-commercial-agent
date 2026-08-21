@@ -137,3 +137,13 @@ Al final de cada turno el agente recalcula de forma determinística la etapa y l
 La memoria del prospecto (`update_conversation_memory`) distingue `hasBrand` (tiene nombre de marca) de `hasLogo` (tiene logo definido), y guarda `useCase`, `hasOwnContainers`, `labelRequirements`, `paymentStatus`, `currentObjection`, `salesStage` y `pendingTopic`. Reglas: solo guarda información explícita (no infiere logo por marca, ni delivery por ubicación), no sobreescribe un valor confirmado con null por falta de mención, y no repite preguntas sobre datos ya confirmados. Para resolver un tema de forma explícita se usan `clearCurrentObjection`/`clearPendingTopic` (omitir el campo conserva el valor; una cotización entregada resuelve la objeción salvo re-afirmación explícita). La coherencia `hasOwnContainers` ↔ `purchaseType` nunca persiste estados contradictorios.
 
 El agente no cierra prematuramente: una objeción activa (`currentObjection`) tiene prioridad sobre cualquier cierre, y `prepare_purchase` solo ocurre con señales suficientes (cotización entregada, sin objeción, sin tema pendiente, readiness `qualified`/`ready_for_handoff` y datos completos) — una cotización por sí sola no es intención de compra. La forma de pago general de maquila no está documentada (se confirma con asesor).
+
+## Voz conversacional y canal (Bloque C)
+
+- **Perfiles de generación** (`GENERATION_PROFILES` en el agente; `complete()` del provider acepta `temperature`/`maxTokens` por llamada con defaults retrocompatibles): decisión/herramientas a `temperature 0` (maxTokens 1200) y redacción final a `0.3` (maxTokens 400). La temperatura nunca gobierna hechos comerciales: precios, totales, mínimos y condiciones se componen determinísticamente.
+- **Registro:** tratamiento comercial predeterminado **“usted”** (habla desde Agua ReNew como “nosotros”, cercano y no burocrático); `CommercialAdvisorVoice` y las plantillas determinísticas del engine quedaron en “usted”.
+- **Conversación continua:** `conversationHasStarted` se deriva del historial; en turnos posteriores no se repiten saludos ni la presentación de Agua ReNew.
+- **Perfil de la plataforma:** el nombre visible nunca se usa automáticamente (solo si la persona se presenta o está confirmado en memoria).
+- **Emojis moderados** (1–2 en el primer mensaje si ayudan; 0 en seguimientos) y **brevedad** (respuesta normal de 40–90 palabras, con diagnostics `wordCount`/`responseDetailLevel`).
+- **Canal:** el agente recibe `channel` (local/instagram/messenger/whatsapp); en Instagram/Messenger continúa en el mismo canal sin pedir WhatsApp.
+- **Métricas:** `channel`, `generation_profile`, `temperature_used` y `max_tokens_used` en diagnostics (sin contenido de razonamiento).

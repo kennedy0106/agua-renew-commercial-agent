@@ -35,7 +35,7 @@ test('una conversación IA nueva espera el primer mensaje y acepta texto libre s
   const result = await engine.dispatch({ type: 'submit_text', value: 'Hola' });
   assert.equal(provider.requests.length, 1);
   assert.equal(provider.requests[0].userMessage, 'Hola');
-  assert.match(result.messages.at(-1).text, /Puedo ayudarte/i);
+  assert.match(result.messages.at(-1).text, /Podemos ayudarle/i);
 });
 
 test('una cotización IA completa por texto no solicita pasos o botones redundantes', async () => {
@@ -46,18 +46,18 @@ test('una cotización IA completa por texto no solicita pasos o botones redundan
   assert.equal(provider.requests.length, 1);
   assert.equal(result.state.stage, 'complete');
   assert.match(result.messages.at(-1).text, /S\/ 1\.40/);
-  assert.doesNotMatch(result.messages.at(-1).text, /¿Cuántos paquetes necesitas\?/);
+  assert.doesNotMatch(result.messages.at(-1).text, /¿Cuántos paquetes necesita??\?/);
 });
 
 test('en IA se pregunta solo el producto y luego solo la cantidad que falta', async () => {
   const { engine } = await createEngine([interpretation({ modality: 'maquila' })]);
   const missingProduct = await engine.dispatch({ type: 'submit_text', value: 'Quiero vender agua con mi propia marca' });
   assert.equal(missingProduct.state.stage, 'choose_product');
-  assert.match(missingProduct.messages.at(-1).text, /presentación te interesa/i);
+  assert.match(missingProduct.messages.at(-1).text, /presentación le interesa/i);
 
   const afterProduct = await engine.dispatch({ type: 'select_product', value: 'maquila_botella_1l_fliptop' });
   assert.equal(afterProduct.state.stage, 'await_quantity');
-  assert.match(afterProduct.messages.at(-1).text, /¿Cuántos paquetes necesitas\?/);
+  assert.match(afterProduct.messages.at(-1).text, /¿Cuántos paquetes necesita??\?/);
 });
 
 test('una respuesta corta IA completa la cantidad pendiente usando el estado conversacional', async () => {

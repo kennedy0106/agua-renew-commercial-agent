@@ -150,16 +150,49 @@ function trailingQuestion(text) {
   return question.endsWith('?') ? question : `${question}?`;
 }
 
+/** Transición breve generada por el modelo para abrir una cotización
+ * determinística. Solo se acepta si no contiene montos (integridad: los hechos
+ * de dinero nunca provienen del texto libre) y no excede ~30 palabras. */
+function extractTransition(text) {
+  const t = String(text ?? '').trim();
+  const idx = t.lastIndexOf('?');
+  const head = idx >= 0 ? t.slice(0, idx) : t;
+  const cleaned = head.replace(/[.!¿¡\s]+$/g, '').trim();
+  if (!cleaned) return null;
+  if (/S\/\s?\d/.test(cleaned)) return null;
+  if (cleaned.split(/\s+/).length > 30) return null;
+  return cleaned;
+}
+
 function containsToolProtocolLeak(content, definitions) {
   const text = String(content ?? '');
   if (text.includes('<｜｜DSML｜｜tool_calls>')) return true;
   return definitions.some((definition) => text.includes(definition.function.name));
 }
 
+/** Perfiles de generación: decisión/herramientas determinista (temperature 0);
+ * redacción final con variedad moderada. La temperatura nunca gobierna hechos
+ * comerciales (esos se componen determinísticamente en composeCommercialFacts). */
+const GENERATION_PROFILES = Object.freeze({
+  decision: { temperature: 0, maxTokens: 1200 },
+  final_response: { temperature: 0.3, maxTokens: 400 },
+});
+
+const CHANNEL_RULES = Object.freeze({
+  instagram: 'Canal Instagram: continúe la conversación en este mismo canal; no pida que le escriban por WhatsApp ni ofrezca cambiar de canal. Respuestas breves y directas.',
+  messenger: 'Canal Messenger: continúe la conversación en este mismo canal; no pida que le escriban por WhatsApp ni ofrezca cambiar de canal. Respuestas breves y directas.',
+  whatsapp: 'Canal WhatsApp: mismo asesor comercial de Agua ReNew; tono ligeramente conversacional, respuestas breves y texto plano.',
+  local: 'Canal local (simulador): mismo comportamiento comercial.',
+});
+
 export class CommercialAgent {
   constructor({ provider, tools }) { this.provider = provider; this.tools = tools; }
 
-  systemPrompt(memory, nextBestAction = null) {
+  systemPrompt(memory, nextBestAction = null, channel = 'local', conversationHasStarted = false) {
+    const channelRules = CHANNEL_RULES[channel] ?? CHANNEL_RULES.local;
+    const turnContext = conversationHasStarted
+      ? 'Es una conversación en curso: NO repitas saludos ni la presentación de Agua ReNew (evita “Hola”, “Gracias por escribirnos”, “Con gusto le ayudo”, “En Agua ReNew…”). Continúa como si ya estuvieran hablando.'
+      : 'Es el primer contacto: saluda brevemente (una línea) y pasa a una respuesta útil con una pregunta concreta si corresponde. No acumules cortesías.';
     return [
       'Eres el asesor comercial virtual de primer contacto de Agua ReNew: un vendedor proactivo y consultivo, no un centro de ayuda ni un FAQ. Atiendes, educas, orientas, calificas y haces preventa; conduces la conversación hacia la venta y no negocias condiciones especiales.',
       'MISIÓN: tu objetivo no es responder preguntas aisladas, sino hacer avanzar una oportunidad comercial. Cada respuesta debe cumplir uno o más de estos objetivos: descubrir una necesidad, aumentar el valor percibido, resolver una objeción, calificar al prospecto, recomendar una alternativa, obtener un dato necesario, preparar una cotización o acercar naturalmente a la compra. No fuerces una pregunta si la respuesta ya cumple el objetivo y no empujes un cierre prematuro.',
@@ -168,11 +201,17 @@ export class CommercialAgent {
       'No uses get_product_catalog si la persona ya mencionó una presentación concreta o una cantidad: esa herramienta es exclusivamente para ver opciones amplias. Nunca expliques tu razonamiento, tu plan, IDs de producto ni nombres de herramientas; responde siempre como asesor directamente a la persona.',
       `CATÁLOGO_CANÓNICO_PARA_HERRAMIENTAS=${JSON.stringify(this.tools.agentCatalog())}`,
       'En get_quote usa exclusivamente un productId exacto del catálogo canónico. No coloques una presentación informal como productId. Usa purchaseType solo cuando la herramienta lo requiera; la modalidad no es un purchaseType.',
-      'Usa un tono peruano profesional, cercano, seguro y consultivo. Habla con “tú” y “nosotros”; nunca hables de “el cliente”. Responde primero la duda y luego, solo si aporta valor, propone un siguiente paso pequeño y natural. Una pregunta útil como máximo por respuesta normal.',
+      'REGISTRO: tratamiento comercial predeterminado “usted” (¿Qué presentación le interesa trabajar?, ¿Ya cuenta con un logo?, Podemos ayudarlo con esa parte). Habla desde Agua ReNew como “nosotros”. Tono peruano profesional, cercano y consultivo; evita “señor”, “señora” y “estimado” salvo contexto real; no suenes burocrático. Si el prospecto adopta un trato informal sostenido, puedes flexibilizar ligeramente el tono, pero mantén consistencia y no tutees por un solo saludo.',
+      'Habla directamente con la persona: nunca digas “el cliente” para referirte a quien te escribe (solo cuando hables de los clientes del prospecto).',
+      `CANAL_ACTUAL=${channel}. ${channelRules}`,
+      'No uses el nombre visible del perfil de la plataforma para dirigirte a la persona: solo usa un nombre si ella se presentó explícitamente o ya está confirmado en memoria. No empieces respuestas con “Hola [nombre]” solo porque la plataforma lo muestra.',
+      turnContext,
+      'EMOJIS moderados: en el primer mensaje máximo 1–2 si ayudan (no obligatorios); en seguimientos prefiere 0 y usa 1 solo si aporta claridad. Nunca empieces todos los mensajes con el mismo emoji ni uses emojis para sustituir contenido.',
+      'LONGITUD: respuesta normal de 40–90 palabras; menos si la duda es sencilla. Solo supera ~90 palabras para cotizaciones de varias presentaciones, comparaciones o explicaciones solicitadas. Variedad: evita empezar todas las respuestas con las mismas palabras (“Perfecto.”, “Claro.”, “Entiendo.”).',
       'Atiende como vendedor por WhatsApp: texto plano, párrafos breves y viñetas simples solo cuando ayuden. No uses títulos Markdown, tablas, separadores, negritas visibles ni bloques tipo catálogo. Una respuesta normal tiene una idea principal y, como máximo, una pregunta útil.',
       'Conocer mucho no significa decirlo todo. Entrega información de forma progresiva: panorama al inicio; presentación cuando haya interés; precio, mínimo o escala aplicable solo al conocer el producto y la cantidad; más detalle solo si la persona realmente lo pide. Los resultados de herramientas sirven para razonar, nunca debes copiarlos completos.',
       'Elige la herramienta según el siguiente paso comercial: si la persona expresa una modalidad, consulta su panorama con get_modality_overview; si identifica una presentación sin cantidad, usa get_product_information; si identifica presentación y cantidad, prioriza get_quote directamente. No sustituyas una cotización posible por una explicación de empaque o catálogo.',
-      'Cuando la persona pide información de forma general o solo muestra interés (por ejemplo “quiero información”, “¿qué ofrecen?”, “cuéntame de ustedes”, “no conozco el servicio”), presenta de inmediato el panorama del negocio usando get_business_overview: las 3 rutas (maquila con tu propia marca, distribución de la marca Agua ReNew y compra directa) en una lista breve, e invita a elegir una. No te limites a preguntar “¿qué información buscas?” sin aportar nada.',
+      'Cuando la persona pide información de forma general o solo muestra interés (por ejemplo “quiero información”, “¿qué ofrecen?”, “cuénteme de ustedes”, “no conozco el servicio”), presenta de inmediato el panorama del negocio usando get_business_overview: las 3 rutas (maquila con su propia marca, distribución de la marca Agua ReNew y compra directa) en una lista breve, e invita a elegir una. No te limites a preguntar “¿qué información busca?” sin aportar nada.',
       'No eres un formulario: conserva el hilo, admite interrupciones y cambios de tema. Si el prospecto hace una pregunta directa o cambia de tema, responde esa pregunta primero; el siguiente paso sugerido se retoma después si sigue siendo natural. Usa la memoria para entender el negocio, necesidad e interés. Puedes actualizarla solo con datos explícitos usando update_conversation_memory.',
       'NO REPITAS: nunca preguntes nuevamente un dato ya confirmado en memoria (por ejemplo, si has_logo es true no preguntes si tiene logo; si product_id está definido no preguntes qué presentación quiere; si quantity está definida no pidas la cantidad otra vez), salvo contradicción, cambio explícito del prospecto o confirmación necesaria para una cotización.',
       'OBJECIONES: cuando exista una objeción activa (current_objection), responde primero la objeción, refuerza valor cuando sea natural, no saltes al cierre y deja un siguiente paso pequeño. Cuando el prospecto confirma que la objeción quedó resuelta, usa update_conversation_memory con clearCurrentObjection; igual con clearPendingTopic cuando un tema pendiente se resuelve. Omitir esos campos conserva el valor existente.',
@@ -192,17 +231,20 @@ export class CommercialAgent {
 
   async reply({ message, state, history }) {
     const started = performance.now();
+    const channel = state?.channel ?? 'local';
+    const conversationHasStarted = (history?.length ?? 0) > 0;
     // Evaluación estructurada previa al turno (guía para el modelo): siguiente
     // mejor acción y etapa sugeridas desde el estado ANTERIOR al mensaje.
     const initialNextBestAction = getNextBestAction(state);
     const initialSalesStage = suggestSalesStage(state, initialNextBestAction);
     const memory = compactMemory({ ...state, salesStage: initialSalesStage });
     const turns = history.slice(-10).map((turn) => ({ role: turn.role === 'bot' ? 'assistant' : 'user', content: String(turn.text).slice(0, 700) }));
-    const initialMessages = [{ role: 'system', content: this.systemPrompt(memory, initialNextBestAction) }, ...turns, { role: 'user', content: message }];
+    const initialMessages = [{ role: 'system', content: this.systemPrompt(memory, initialNextBestAction, channel, conversationHasStarted) }, ...turns, { role: 'user', content: message }];
     const definitions = this.tools.listDefinitions();
     let first = await this.provider.complete({
       messages: initialMessages,
       tools: definitions, toolChoice: 'auto',
+      ...GENERATION_PROFILES.decision,
     });
     const initialDecision = first;
     const protocolRetry = !first.toolCalls?.length && containsToolProtocolLeak(first.content, definitions);
@@ -213,12 +255,14 @@ export class CommercialAgent {
       first = await this.provider.complete({
         messages: [...initialMessages, { role: 'user', content: 'No expongas planificación ni nombres de herramientas. Ejecuta ahora una única herramienta autorizada y devuelve la llamada de herramienta.' }],
         tools: definitions, toolChoice: 'required',
+        ...GENERATION_PROFILES.decision,
       });
       protocolRetryResult = first;
       if (!first.toolCalls?.length && containsToolProtocolLeak(first.content, definitions)) {
         const recovered = await this.provider.complete({
           messages: [...initialMessages, { role: 'user', content: 'Devuelve únicamente JSON válido con este contrato: {"tool":"nombre de herramienta autorizada","arguments":{}}. Elige la única herramienta necesaria para responder ahora; no incluyas texto adicional.' }],
           responseFormat: { type: 'json_object' }, toolChoice: 'none',
+          ...GENERATION_PROFILES.decision,
         });
         try {
           const instruction = JSON.parse(recovered.content ?? '');
@@ -231,7 +275,7 @@ export class CommercialAgent {
         }
       }
     }
-    const trace = [{ phase: 'agent_decision', finishReason: first.finishReason, toolCalls: first.toolCalls?.map((call) => call.function?.name) ?? [], protocolRetry, protocolRecovery }];
+    const trace = [{ phase: 'agent_decision', finishReason: first.finishReason, toolCalls: first.toolCalls?.map((call) => call.function?.name) ?? [], protocolRetry, protocolRecovery, generationProfile: 'decision', temperatureUsed: GENERATION_PROFILES.decision.temperature, maxTokensUsed: GENERATION_PROFILES.decision.maxTokens }];
     const metrics = {
       aiCallCount: protocolRecovery ? 3 : protocolRetry ? 2 : 1,
       aiLatencyMs: (initialDecision.latencyMs ?? 0) + (protocolRetryResult?.latencyMs ?? 0) + (protocolRecovery ? first.latencyMs ?? 0 : 0),
@@ -265,7 +309,7 @@ export class CommercialAgent {
     });
     if (protocolFailure) return { success: false, errorType: 'tool_protocol_invalid', trace, metrics };
     if (!first.toolCalls?.length) {
-      const guarded = this.tools.exposurePolicy.guardCustomerText(first.content?.trim() || '¿Qué te gustaría revisar?');
+      const guarded = this.tools.exposurePolicy.guardCustomerText(first.content?.trim() || '¿Qué le gustaría revisar?');
       const { context: salesContext } = buildFinalContext([]);
       const diagnostics = { ...responseDiagnostics(guarded.text), complexMarkdown: guarded.complexMarkdown, restrictedOutputSuppressed: guarded.restrictedSuppressed, multipleQuestionsSuppressed: guarded.multipleQuestionsSuppressed ?? false, handoffCategory: null, ...salesContext };
       trace.push({ phase: 'response_policy', ...diagnostics });
@@ -300,32 +344,38 @@ export class CommercialAgent {
       }
     }
     const final = await this.provider.complete({
-      messages: [{ role: 'system', content: this.systemPrompt(memory, initialNextBestAction) }, ...turns, { role: 'user', content: message }, ...toolMessages],
+      messages: [{ role: 'system', content: this.systemPrompt(memory, initialNextBestAction, channel, conversationHasStarted) }, ...turns, { role: 'user', content: message }, ...toolMessages],
       tools: [], toolChoice: 'none',
+      ...GENERATION_PROFILES.final_response,
     });
     metrics.aiCallCount += 1; metrics.aiLatencyMs += final.latencyMs ?? 0; metrics.inputTokens += final.inputTokens ?? 0; metrics.outputTokens += final.outputTokens ?? 0;
-    trace.push({ phase: 'agent_final', finishReason: final.finishReason });
+    trace.push({ phase: 'agent_final', finishReason: final.finishReason, generationProfile: 'final_response', temperatureUsed: GENERATION_PROFILES.final_response.temperature, maxTokensUsed: GENERATION_PROFILES.final_response.maxTokens });
     const nameById = new Map(this.tools.agentCatalog().map((product) => [product.id, product.name]));
     const facts = composeCommercialFacts(metrics.tools, nameById);
     const finalText = final.content?.trim() || '';
-    const followUp = trailingQuestion(finalText) ?? '¿Hay algo más en lo que pueda ayudarte?';
+    const followUp = trailingQuestion(finalText) ?? '¿Hay algo más en lo que pueda ayudarle?';
     // Los hechos comerciales críticos (dinero y condiciones) son autoritativos:
     // se componen determinísticamente desde el resultado de la herramienta, no
-    // desde el texto libre del modelo. El modelo solo aporta la pregunta de cierre.
+    // desde el texto libre del modelo. El modelo aporta una transición breve
+    // (solo si no contiene montos) y la pregunta de cierre.
     let groundedText;
     if (facts) {
-      groundedText = `Claro. ${facts}\n\n${followUp}`;
+      const transition = extractTransition(finalText);
+      const separator = transition && !/[?!.]$/.test(transition) ? '. ' : ' ';
+      const opener = transition ? `${transition}${separator}${facts}` : `Claro. ${facts}`;
+      groundedText = `${opener}\n\n${followUp}`;
     } else if (/S\/\s?\d/.test(finalText)) {
       // El modelo afirmó un monto sin respaldo de una herramienta de dinero:
       // se suprime para no arriesgar un precio inventado o incorrecto.
-      groundedText = 'Déjame confirmarte el precio exacto. ¿Me indicas qué presentación o servicio te interesa?';
+      groundedText = 'Permítame confirmar el precio exacto. ¿Qué presentación o servicio le interesa?';
     } else {
       groundedText = finalText;
     }
     const guarded = this.tools.exposurePolicy.guardCustomerText(groundedText);
     const audits = metrics.tools.map((tool) => tool.exposureAudit).filter(Boolean);
     const { context: salesContext } = buildFinalContext(metrics.tools);
-    const diagnostics = { ...responseDiagnostics(guarded.text, audits), complexMarkdown: guarded.complexMarkdown, restrictedOutputSuppressed: guarded.restrictedSuppressed, multipleQuestionsSuppressed: guarded.multipleQuestionsSuppressed ?? false, toolResultGroundingAdded: Boolean(facts), quoteResponseComposedLocally: Boolean(facts), handoffCategory: handoff?.context?.handoff_category ?? null, ...salesContext };
+    const generationContext = { channel, generation_profile: 'final_response', temperature_used: GENERATION_PROFILES.final_response.temperature, max_tokens_used: GENERATION_PROFILES.final_response.maxTokens };
+    const diagnostics = { ...responseDiagnostics(guarded.text, audits), complexMarkdown: guarded.complexMarkdown, restrictedOutputSuppressed: guarded.restrictedSuppressed, multipleQuestionsSuppressed: guarded.multipleQuestionsSuppressed ?? false, toolResultGroundingAdded: Boolean(facts), quoteResponseComposedLocally: Boolean(facts), handoffCategory: handoff?.context?.handoff_category ?? null, ...salesContext, ...generationContext };
     trace.push({ phase: 'response_policy', ...diagnostics });
     return {
       success: Boolean(guarded.text), text: guarded.text, memory: finalMemory(salesContext), handoff, trace,

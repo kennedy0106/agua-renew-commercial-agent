@@ -69,8 +69,7 @@ test('un saludo se atiende con cordialidad antes de cualquier diagnóstico comer
   const result = await engine.dispatch({ type: 'submit_text', value: 'Buenos días' });
   const reply = result.messages.at(-1).text;
   assert.match(reply, /gracias por escribirnos a Agua ReNew/i);
-  assert.match(reply, /Con gusto puedo ayudarte/i);
-  assert.match(reply, /¿Qué estás buscando hoy\?/i);
+  assert.match(reply, /¿En qué podemos ayudarle hoy\?/i);
   assert.doesNotMatch(reply, /consumo propio o para comercializarlos/i);
 });
 
@@ -83,7 +82,7 @@ test('un saludo combinado con una consulta conserva el saludo y la intención co
   const result = await engine.dispatch({ type: 'submit_text', value: 'hola, quiero distribuir su marca' });
   const reply = result.messages.at(-1).text;
   assert.match(reply, /^Hola, gracias por escribirnos a Agua ReNew/i);
-  assert.match(reply, /Con la distribución puedes adquirir productos terminados/i);
+  assert.match(reply, /Con la distribución puede adquirir productos terminados/i);
 });
 
 test('un acknowledge con modalidad y movimiento comercial no pierde el hilo de la conversación', async () => {
@@ -95,9 +94,9 @@ test('un acknowledge con modalidad y movimiento comercial no pierde el hilo de l
   })]);
   const result = await engine.dispatch({ type: 'submit_text', value: 'quiero trabajar con su marca' });
   const reply = result.messages.at(-1).text;
-  assert.match(reply, /buscas comercializar productos con nuestra marca Agua ReNew/i);
-  assert.match(reply, /¿qué presentación te interesa manejar\?/i);
-  assert.doesNotMatch(reply, /^De acuerdo\. Dime qué te gustaría revisar/i);
+  assert.match(reply, /busca comercializar productos con nuestra marca Agua ReNew/i);
+  assert.match(reply, /¿qué presentación le interesa manejar?\?/i);
+  assert.doesNotMatch(reply, /^De acuerdo\. Dígame qué le gustaría revisar/i);
   assert.match(provider.requests[0].systemPrompt, /ULTIMO_TURNO_JSON=/);
 });
 
@@ -109,8 +108,8 @@ test('una modalidad ya entendida tiene prioridad sobre una pregunta genérica de
   const result = await engine.dispatch({ type: 'submit_text', value: 'hola, quiero distribuir su marca' });
   const reply = result.messages.at(-1).text;
   assert.match(reply, /Hola, gracias por escribirnos a Agua ReNew/i);
-  assert.match(reply, /buscas comercializar productos con nuestra marca Agua ReNew/i);
-  assert.match(reply, /¿qué presentación te interesa manejar\?/i);
+  assert.match(reply, /busca comercializar productos con nuestra marca Agua ReNew/i);
+  assert.match(reply, /¿qué presentación le interesa manejar?\?/i);
   assert.doesNotMatch(reply, /consumo propio o para comercializarlos/i);
 });
 
@@ -127,9 +126,9 @@ test('pedir marca propia prioriza la presentación sobre una operación explicat
   assert.equal(result.state.modality, 'maquila');
   assert.equal(result.state.pendingField, 'product');
   assert.match(reply.text, /trabajar con una marca propia/i);
-  assert.match(reply.text, /¿qué presentación te interesa manejar\?/i);
+  assert.match(reply.text, /¿qué presentación le interesa manejar?\?/i);
   assert.ok(reply.options.length > 0);
-  assert.doesNotMatch(reply.text, /Si te parece, puedo mostrarte las presentaciones disponibles o revisar una cotización/i);
+  assert.doesNotMatch(reply.text, /Si le parece, puedo mostrarle las presentaciones disponibles o revisar una cotización/i);
 });
 
 test('una aceptación ambigua retoma opciones previas y no reinicia el diagnóstico', async () => {
@@ -145,9 +144,9 @@ test('una aceptación ambigua retoma opciones previas y no reinicia el diagnóst
   engine.state.offeredOptions = [{ id: 'products_and_prices', label: 'Ver productos' }, { id: 'quote', label: 'Cotizar' }];
   const result = await engine.dispatch({ type: 'submit_text', value: 'de acuerdo' });
   const reply = result.messages.at(-1);
-  assert.match(reply.text, /puedo mostrarte las presentaciones disponibles o revisar una cotización/i);
+  assert.match(reply.text, /puedo mostrarle las presentaciones disponibles o revisar una cotización/i);
   assert.equal(reply.options.length, 2);
-  assert.doesNotMatch(reply.text, /¿quieres trabajar con tu propia marca o comercializar productos de Agua ReNew/i);
+  assert.doesNotMatch(reply.text, /¿desea trabajar con su propia marca o comercializar productos de Agua ReNew/i);
   assert.equal(result.state.modality, 'maquila');
 });
 
@@ -160,8 +159,8 @@ test('un acto social no descarta una modalidad y un siguiente paso comerciales',
   const result = await engine.dispatch({ type: 'submit_text', value: 'con mi propia marca' });
   const reply = result.messages.at(-1).text;
   assert.match(reply, /trabajar con una marca propia/i);
-  assert.match(reply, /¿qué presentación te interesa manejar\?/i);
-  assert.doesNotMatch(reply, /^De acuerdo\. Dime qué te gustaría revisar/i);
+  assert.match(reply, /¿qué presentación le interesa manejar?\?/i);
+  assert.doesNotMatch(reply, /^De acuerdo\. Dígame qué le gustaría revisar/i);
   assert.equal(result.state.modality, 'maquila');
   assert.equal(result.state.pendingField, 'product');
 });
@@ -188,7 +187,7 @@ test('clarificación y unknown conversacional no se convierten en fallos técnic
 
   const unknown = await createEngine([plan({ dialogue_act: 'unknown', intent: 'unknown', response_goal: 'unknown' })]);
   const unknownResult = await unknown.engine.dispatch({ type: 'submit_text', value: 'asdf qwe' });
-  assert.match(unknownResult.messages.at(-1).text, /No llegué a entenderte bien/i);
+  assert.match(unknownResult.messages.at(-1).text, /No llegué a entenderle bien/i);
   assert.equal(unknown.repository.turnMetrics.at(-1).resolution, 'deepseek');
   assert.equal(unknown.repository.turnMetrics.at(-1).technicalFallback, false);
 });
@@ -213,9 +212,9 @@ test('el asesor avanza por diagnóstico y no lista productos al detectar una mod
 
   result = await engine.dispatch({ type: 'submit_text', value: 'con la de ustedes' });
   const reply = result.messages.at(-1);
-  assert.match(reply.text, /buscas comercializar productos con nuestra marca Agua ReNew/i);
+  assert.match(reply.text, /busca comercializar productos con nuestra marca Agua ReNew/i);
   assert.match(reply.text, /productos terminados/i);
-  assert.match(reply.text, /¿Qué presentación te interesa manejar\?/i);
+  assert.match(reply.text, /¿Qué presentación le interesa manejar?\?/i);
   assert.doesNotMatch(reply.text, /Presentaciones documentadas|•/);
   assert.ok(reply.options.length > 0);
   assert.equal(result.state.salesStage, 'solution_presentation');
@@ -257,10 +256,10 @@ test('una consulta sobre servicios explica modalidades antes de ofrecer un catá
   })]);
   const result = await engine.dispatch({ type: 'submit_text', value: '¿Qué servicios ofrecen?' });
   const reply = result.messages.at(-1);
-  assert.match(reply.text, /Claro, con gusto te explico/i);
+  assert.match(reply.text, /Claro, con gusto le explicamos/i);
   assert.match(reply.text, /💧 Distribución con nuestra marca/i);
   assert.match(reply.text, /🏷️ Maquila \/ marca propia/i);
-  assert.match(reply.text, /cuál de las dos opciones encaja mejor contigo/i);
+  assert.match(reply.text, /cuál de las dos opciones encaja mejor con su caso/i);
   assert.doesNotMatch(reply.text, /• .*Botella/);
 });
 
@@ -272,11 +271,11 @@ test('la compra para consumo propio reconoce la necesidad y explica las dos opci
   })]);
   const result = await engine.dispatch({ type: 'submit_text', value: 'quiero comprar Agua ReNew para mi consumo' });
   const reply = result.messages.at(-1);
-  assert.match(reply.text, /buscas Agua ReNew para tu consumo/i);
+  assert.match(reply.text, /busca Agua ReNew para su consumo/i);
   assert.match(reply.text, /Recarga de bidón de 20 L/i);
   assert.match(reply.text, /Bidón completo de 20 L/i);
   assert.match(reply.text, /Incluye envase y primera recarga/i);
-  assert.match(reply.text, /¿Cuál de las dos opciones necesitas\?/i);
+  assert.match(reply.text, /¿Cuál de las dos opciones necesita\?/i);
   assert.equal(reply.options.length, 2);
 });
 
@@ -292,5 +291,5 @@ test('una consulta multitema conserva precios y mínimos en lugar de volver a pe
   assert.match(reply, /Pedido mínimo: 10 recargas/i);
   assert.match(reply, /Precio: S\/ 7\.00 por unidad/i);
   assert.match(reply, /precio cambia según la cantidad/i);
-  assert.doesNotMatch(reply, /¿qué presentación te interesa manejar/i);
+  assert.doesNotMatch(reply, /¿qué presentación le interesa manejar?/i);
 });

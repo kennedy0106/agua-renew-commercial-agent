@@ -67,7 +67,13 @@ export class DeepSeekProvider extends AIProvider {
     throw new AIProviderError('empty_response', 'DeepSeek returned no JSON content.', result);
   }
 
-  async complete({ messages, tools = undefined, toolChoice = undefined, responseFormat = undefined }) {
+  /**
+   * Llamada de chat con overrides por perfil de generación.
+   * Defaults retrocompatibles: temperature 0, maxTokens = this.maxTokens.
+   * Perfiles: decisión/herramientas (temperature 0) y redacción final
+   * (temperature moderada, maxTokens menor). El llamador elige.
+   */
+  async complete({ messages, tools = undefined, toolChoice = undefined, responseFormat = undefined, temperature = 0, maxTokens = this.maxTokens }) {
     if (!this.isConfigured()) {
       throw new AIProviderError('not_configured', 'DeepSeek no está configurado.');
     }
@@ -85,8 +91,8 @@ export class DeepSeekProvider extends AIProvider {
         const payload = {
           model: this.model,
           messages: requestMessages,
-          temperature: 0,
-          max_tokens: this.maxTokens,
+          temperature,
+          max_tokens: maxTokens,
         };
         if (responseFormat) payload.response_format = responseFormat;
         if (tools?.length) payload.tools = tools;

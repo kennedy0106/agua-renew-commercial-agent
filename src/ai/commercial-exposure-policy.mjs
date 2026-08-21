@@ -219,7 +219,7 @@ export class CommercialExposurePolicy {
     const restricted = containsRestrictedTerm(lower);
     if (restricted) {
       return {
-        text: 'Con gusto te oriento: puedo contarte sobre nuestras presentaciones, precios y condiciones para que elijas lo mejor para tu caso. ¿Qué te gustaría saber en concreto?',
+        text: 'Con gusto le oriento: puedo contarle sobre nuestras presentaciones, precios y condiciones para que elija lo mejor para su caso. ¿Qué le gustaría saber en concreto?',
         complexMarkdown: hasComplexMarkdown,
         restrictedSuppressed: true,
       };

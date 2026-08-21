@@ -59,7 +59,7 @@ test('IA conserva producto y modalidad conocidos y pregunta únicamente cantidad
   const result = await engine.dispatch({ type: 'submit_text', value: 'Quiero botellas de litro con mi marca' });
   assert.equal(result.state.stage, 'await_quantity');
   assert.equal(result.state.productId, 'maquila_botella_1l_fliptop');
-  assert.match(result.messages.at(-1).text, /¿Cuántos paquetes necesitas\?/);
+  assert.match(result.messages.at(-1).text, /¿Cuántos paquetes necesita?\?/);
 });
 
 test('delivery en Miraflores no inventa importe y deriva según CommercialService', async () => {
