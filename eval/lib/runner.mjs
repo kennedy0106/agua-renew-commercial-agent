@@ -81,6 +81,16 @@ export async function runScenario({ scenario, provider, conversationIndex, timeo
   const lastUsage = usageLogs.at(-1);
   const finalNextAction = getNextBestAction(finalState);
   const nextAction = finalState.nextBestAction ?? finalNextAction.action;
+  // Tools con args (para product_resolution_accuracy): dedupe por nombre+args.
+  const toolsWithArgs = [];
+  for (const u of usageLogs) {
+    for (const t of u.parsedResponse?.tools ?? []) {
+      const key = `${t.name}:${JSON.stringify(t.args ?? {})}`;
+      if (!toolsWithArgs.some((x) => `${x.name}:${JSON.stringify(x.args)}` === key)) {
+        toolsWithArgs.push({ name: t.name, args: t.args ?? {}, resultStatus: t.resultStatus });
+      }
+    }
+  }
 
   const result = {
     scenario,
@@ -88,6 +98,7 @@ export async function runScenario({ scenario, provider, conversationIndex, timeo
     fullText,
     toolsCalled: [...new Set(toolsCalled)],
     toolsPerTurn,
+    toolsWithArgs,
     finalState,
     nextAction,
     errors,

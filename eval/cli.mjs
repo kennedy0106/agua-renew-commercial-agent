@@ -60,7 +60,8 @@ function regrade(runIdArg) {
         expect: loadDataset().scenarios.find((s) => s.id === t.scenarioId)?.expect ?? {},
       },
       replies: t.replies, fullText: t.replies.join('\n'), toolsCalled: t.toolsCalled,
-      toolsPerTurn: t.toolsPerTurn, finalState: t.finalState, nextAction: t.nextAction,
+      toolsPerTurn: t.toolsPerTurn, toolsWithArgs: t.toolCalls ?? [],
+      finalState: t.finalState, nextAction: t.nextAction,
       errors: t.errors ?? [], usage: t.usage, latencies: { turnMs: t.latencies?.turnMs ?? [] },
     };
     return { ...base, ...gradeScenario(base) };

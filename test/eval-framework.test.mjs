@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { loadDataset, validateScenario, filterScenarios, categoryBreakdown } from '../eval/lib/dataset.mjs';
-import { gradeScenario, gradePrice, gradeMinimum, gradePolicy, gradeRestricted, gradeChannel, gradeTone } from '../eval/lib/graders.mjs';
+import { gradeScenario, gradePrice, gradeMinimum, gradePolicy, gradeRestricted, gradeChannel, gradeTone, gradeGroundedClaims, gradeProductResolution, gradeProtocolLeak, gradeSalesOrientation, gradeNaturalness, EVAL_GRADER_VERSION } from '../eval/lib/graders.mjs';
 import { aggregateGrades, globalScore, criticalFailureSummary, categoryMatrix, THRESHOLDS } from '../eval/lib/scoring.mjs';
 import { estimateCost, usageTotals, estimateRunCost, loadModels } from '../eval/lib/cost.mjs';
 import { latencySummary, buildReport, renderMarkdown } from '../eval/lib/report.mjs';
@@ -191,4 +191,113 @@ test('REPORTE: buildReport y renderMarkdown generan salida legible', () => {
   assert.match(md, /# Reporte de evaluación/);
   assert.match(md, /Critical failures/);
   assert.match(md, /E001/);
+});
+
+// ── Calibración v2 (secciones 1-14/31) ──
+
+test('COSTO: costPer1000 = costo total / escenarios × 1000 (no total × 1000)', () => {
+  // buildReport ya está importado al inicio del archivo.
+  const report = buildReport({
+    runId: 'cost-test', timestamp: 'x', datasetVersion: 1,
+    modelConfig: { key: 'm', label: 'M', provider: 'x', modelId: 'm', pricing: {} },
+    scenarioResults: Array.from({ length: 100 }, () => ({ scenario: { id: 'x', turns: ['a'] }, replies: [], grades: {}, critical: false })),
+    summary: {}, global: 50, criticalFailures: [], matrix: {}, turnLatencyMs: [], aiLatencyMs: [],
+    usage: { requests: 100, inputTokens: 0, outputTokens: 0, totalTokens: 0 }, estimatedCostUSD: 0.5,
+  });
+  assert.ok(Math.abs(report.tokenization.costPerConversation - 0.005) < 1e-9);
+  assert.ok(Math.abs(report.tokenization.costPer1000Conversations - 5.0) < 1e-6);
+  // Baseline real: 81 escenarios, USD 0.2705 → ~3.34/1000 (tolerancia redondeo).
+  const report81 = buildReport({
+    runId: 'cost-test2', timestamp: 'x', datasetVersion: 1,
+    modelConfig: { key: 'm', label: 'M', provider: 'x', modelId: 'm', pricing: {} },
+    scenarioResults: Array.from({ length: 81 }, () => ({ scenario: { id: 'x', turns: ['a'] }, replies: [], grades: {}, critical: false })),
+    summary: {}, global: 50, criticalFailures: [], matrix: {}, turnLatencyMs: [], aiLatencyMs: [],
+    usage: { requests: 106, inputTokens: 0, outputTokens: 0, totalTokens: 0 }, estimatedCostUSD: 0.2705,
+  });
+  assert.ok(Math.abs(report81.tokenization.costPer1000Conversations - 3.34) < 0.05, `costo/1000 = ${report81.tokenization.costPer1000Conversations}`);
+});
+
+test('RESTRICTED: la palabra "margen" sola NO es fuga restringida', () => {
+  const g = gradeRestricted({ fullText: 'Entiendo su punto, el margen siempre es clave al evaluar. ¿Qué volumen maneja?', toolsCalled: [], expect: {} });
+  assert.equal(g.score, 2);
+  assert.equal(g.critical, true);
+});
+
+test('GROUNDED: "el margen mejora con volumen" es claim no grounded (fail sin critical)', () => {
+  const g = gradeGroundedClaims({ fullText: 'En maquila el margen mejora conforme aumenta el volumen.', expect: {} });
+  assert.equal(g.score, 0);
+  assert.equal(g.critical, false);
+});
+
+test('GROUNDED: "tenemos stock disponible" falla con critical', () => {
+  const g = gradeGroundedClaims({ fullText: 'Sí, tenemos stock disponible para esa presentación.', expect: {} });
+  assert.equal(g.score, 0);
+  assert.equal(g.critical, true);
+});
+
+test('PRODUCTO: cotizar el producto equivocado con precio válido falla (critical)', () => {
+  const g = gradeProductResolution({
+    finalState: { modality: null, productId: 'distribution_bidon_20l_new', purchaseType: null },
+    toolsWithArgs: [{ name: 'get_quote', args: { productId: 'distribution_bidon_20l_new', quantity: 50 } }],
+    expect: { expectedModality: 'maquila', expectedProductId: 'maquila_bidon_20l', expectedPurchaseType: 'new_bidon_first_refill' },
+  });
+  assert.equal(g.score, 0);
+  assert.equal(g.critical, true);
+});
+
+test('PRODUCTO: purchaseType incorrecto falla', () => {
+  const g = gradeProductResolution({
+    finalState: { productId: 'maquila_bidon_20l', purchaseType: 'new_bidon_first_refill' },
+    toolsWithArgs: [],
+    expect: { expectedProductId: 'maquila_bidon_20l', expectedPurchaseType: 'refill_with_own_container' },
+  });
+  assert.equal(g.score, 0);
+  assert.equal(g.critical, false);
+});
+
+test('PRODUCTO: modalidad incorrecta persistida falla', () => {
+  const g = gradeProductResolution({
+    finalState: { modality: 'distribution_agua_renew', productId: 'distribution_botella_625ml_rosca' },
+    toolsWithArgs: [],
+    expect: { expectedModality: 'maquila', expectedProductId: 'maquila_botella_625ml_rosca' },
+  });
+  assert.equal(g.score, 0);
+});
+
+test('PROTOCOL: "La herramienta requiere un purchaseType" falla', () => {
+  const g = gradeProtocolLeak({ fullText: 'La herramienta requiere un purchaseType. Déjame consultar nuevamente.', expect: {} });
+  assert.equal(g.score, 0);
+  assert.equal(g.critical, true);
+});
+
+test('PROTOCOL: razonamiento en inglés interno falla', () => {
+  for (const text of ['The user wants a quote for 20 paquetes.', 'Need to ask the district first.', 'According to the tool result, the price is valid.']) {
+    const g = gradeProtocolLeak({ fullText: text, expect: {} });
+    assert.equal(g.score, 0, `no detectado: ${text}`);
+  }
+});
+
+test('NATURALNESS: respuesta truncada se penaliza', () => {
+  const g = gradeNaturalness({ replies: ['¿Qué volumen maneja aproximadament'] });
+  assert.ok(g.score < 2, `score ${g.score}`);
+});
+
+test('SALES: no aprueba solo por longitud > 20', () => {
+  const g = gradeSalesOrientation({ replies: ['Sí, claro, sin problema alguno.'], toolsPerTurn: [[]], toolsCalled: [], nextAction: 'answer_current_question', expect: {} });
+  assert.equal(g.score, 0);
+  const ok = gradeSalesOrientation({ replies: ['¿Qué presentación le interesa?'], toolsPerTurn: [[]], toolsCalled: [], nextAction: 'ask_product', expect: {} });
+  assert.ok(ok.score >= 1);
+  const move = gradeSalesOrientation({ replies: ['¿Qué presentación le interesa?'], toolsPerTurn: [[]], toolsCalled: [], nextAction: 'ask_product', expect: { expectedCommercialMove: 'provide_quote' } });
+  assert.equal(move.score, 0);
+});
+
+test('REPORTE: incluye graderVersion', () => {
+  // buildReport ya está importado al inicio del archivo.
+  const report = buildReport({
+    runId: 'gv', timestamp: 'x', datasetVersion: 1,
+    modelConfig: { key: 'm', label: 'M', provider: 'x', modelId: 'm', pricing: {} },
+    scenarioResults: [], summary: {}, global: 50, criticalFailures: [], matrix: {},
+    turnLatencyMs: [], aiLatencyMs: [], usage: { requests: 0, inputTokens: 0, outputTokens: 0, totalTokens: 0 }, estimatedCostUSD: 0,
+  });
+  assert.equal(report.evalGraderVersion, EVAL_GRADER_VERSION);
 });

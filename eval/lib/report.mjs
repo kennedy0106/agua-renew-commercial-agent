@@ -2,6 +2,7 @@
 import { writeFileSync, mkdirSync, existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { execSync } from 'node:child_process';
+import { EVAL_GRADER_VERSION } from './graders.mjs';
 
 const RESULTS_DIR = path.join('eval', 'results');
 const REPORTS_DIR = path.join('eval', 'reports');
@@ -30,11 +31,14 @@ function commitSha() {
 
 /** Construye el reporte agregado de una corrida. */
 export function buildReport({ runId, timestamp, datasetVersion, modelConfig, scenarioResults, summary, global, criticalFailures, matrix, turnLatencyMs, aiLatencyMs, usage, estimatedCostUSD }) {
+  const scenarioCount = Math.max(1, scenarioResults.length);
+  const costPerConversation = Number((estimatedCostUSD / scenarioCount).toFixed(4));
   return {
     runId,
     timestamp,
     commitSha: commitSha(),
     evalDatasetVersion: datasetVersion,
+    evalGraderVersion: EVAL_GRADER_VERSION,
     model: {
       key: modelConfig.key,
       label: modelConfig.label,
@@ -63,8 +67,10 @@ export function buildReport({ runId, timestamp, datasetVersion, modelConfig, sce
     tokenization: {
       tokensPerTurn: scenarioResults.length ? Math.round(usage.totalTokens / Math.max(1, scenarioResults.reduce((a, r) => a + r.scenario.turns.length, 0))) : 0,
       tokensPerConversation: scenarioResults.length ? Math.round(usage.totalTokens / scenarioResults.length) : 0,
-      costPerConversation: scenarioResults.length ? Number((estimatedCostUSD / scenarioResults.length).toFixed(4)) : 0,
-      costPer1000Conversations: Number((estimatedCostUSD * 1000).toFixed(2)),
+      // costPerConversation = costo total de la corrida / número de conversaciones;
+      // costPer1000 = ese costo unitario × 1000 (no el costo total × 1000).
+      costPerConversation,
+      costPer1000Conversations: Number((costPerConversation * 1000).toFixed(2)),
     },
     topFailures: topFailures(scenarioResults),
   };
@@ -101,6 +107,7 @@ export function saveTranscripts({ runId, scenarioResults }) {
       replies: result.replies,
       toolsCalled: result.toolsCalled,
       toolsPerTurn: result.toolsPerTurn,
+      toolCalls: result.toolsWithArgs ?? [],
       finalState: result.finalState,
       nextAction: result.nextAction,
       grades: Object.fromEntries(Object.entries(result.grades).map(([k, g]) => [k, { score: g.score, reason: g.reason, violations: g.violations }])),
@@ -123,6 +130,7 @@ export function renderMarkdown(report) {
   lines.push(`- **Fecha**: ${report.timestamp}`);
   lines.push(`- **Commit**: ${report.commitSha}`);
   lines.push(`- **Dataset**: v${report.evalDatasetVersion} — ${report.scenariosTotal} escenarios (${report.scenariosWithErrors} con errores de ejecución)`);
+  lines.push(`- **Grader**: v${report.evalGraderVersion} (re-grado del mismo transcript, sin nueva llamada API)`);
   lines.push(`- **Modelo**: ${m.label} (${m.provider} / ${m.modelId})`);
   lines.push(`- **Score global**: ${report.globalScore ?? 'n/d'} / 100`);
   lines.push(`- **Critical failures**: ${report.criticalFailures.length}`);

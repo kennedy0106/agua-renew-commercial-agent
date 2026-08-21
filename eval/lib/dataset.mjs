@@ -15,6 +15,8 @@ export const ALLOWED_CATEGORIES = [
 const EXPECT_KEYS = new Set([
   'tools', 'forbiddenTools', 'text', 'forbidden', 'forbiddenInLastTurn', 'paymentTransfer',
   'finalState', 'nextAction', 'noRepeatOf', 'noPrematureClose', 'maxWords', 'channelCompliance', 'critical',
+  'expectedModality', 'expectedProductId', 'expectedPurchaseType', 'expectedCommercialMove',
+  'forbiddenGroundedClaims', 'allowedClaims', 'forbiddenProtocolTerms',
 ]);
 
 export function validateScenario(scenario, index) {

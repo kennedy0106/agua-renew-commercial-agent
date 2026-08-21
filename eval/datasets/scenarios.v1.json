@@ -49,7 +49,8 @@
           "maquila",
           "distribución"
         ],
-        "maxWords": 110
+        "maxWords": 110,
+        "expectedCommercialMove": "explain_modality"
       }
     },
     {
@@ -68,7 +69,8 @@
           "distribución",
           "compra directa"
         ],
-        "maxWords": 110
+        "maxWords": 110,
+        "expectedCommercialMove": "explain_modality"
       }
     },
     {
@@ -102,7 +104,8 @@
           "maquila",
           "distribución"
         ],
-        "maxWords": 110
+        "maxWords": 110,
+        "expectedCommercialMove": "explain_modality"
       }
     },
     {
@@ -121,7 +124,8 @@
           "distribución",
           "compra directa"
         ],
-        "maxWords": 110
+        "maxWords": 110,
+        "expectedCommercialMove": "explain_modality"
       }
     },
     {
@@ -139,7 +143,8 @@
           "maquila",
           "distribución"
         ],
-        "maxWords": 110
+        "maxWords": 110,
+        "expectedCommercialMove": "explain_modality"
       }
     },
     {
@@ -157,7 +162,8 @@
           "marca propia",
           "presentación"
         ],
-        "maxWords": 110
+        "maxWords": 110,
+        "expectedCommercialMove": "explain_modality"
       }
     },
     {
@@ -175,7 +181,8 @@
           "distribución",
           "presentación"
         ],
-        "maxWords": 110
+        "maxWords": 110,
+        "expectedCommercialMove": "explain_modality"
       }
     },
     {
@@ -193,7 +200,8 @@
           "625",
           "mínimo es de 20"
         ],
-        "maxWords": 110
+        "maxWords": 110,
+        "expectedCommercialMove": "ask_product"
       }
     },
     {
@@ -211,7 +219,8 @@
           "1 L",
           "mínimo es de 20"
         ],
-        "maxWords": 110
+        "maxWords": 110,
+        "expectedCommercialMove": "ask_product"
       }
     },
     {
@@ -229,7 +238,8 @@
           "S/ 12.00",
           "mínimo es de 20"
         ],
-        "critical": true
+        "critical": true,
+        "expectedCommercialMove": "provide_quote"
       }
     },
     {
@@ -247,7 +257,8 @@
           "S/ 15.00",
           "mínimo es de 20"
         ],
-        "critical": true
+        "critical": true,
+        "expectedCommercialMove": "provide_quote"
       }
     },
     {
@@ -309,7 +320,8 @@
           "distribución",
           "presentación"
         ],
-        "maxWords": 110
+        "maxWords": 110,
+        "expectedCommercialMove": "explain_modality"
       }
     },
     {
@@ -326,7 +338,8 @@
         "text": [
           "S/ 9.45"
         ],
-        "critical": true
+        "critical": true,
+        "expectedCommercialMove": "provide_quote"
       }
     },
     {
@@ -345,7 +358,8 @@
           "rentabilidad",
           "margen"
         ],
-        "maxWords": 110
+        "maxWords": 110,
+        "expectedCommercialMove": "inform_boundary"
       }
     },
     {
@@ -363,7 +377,8 @@
           "S/ 11.25",
           "mínimo es de 20"
         ],
-        "critical": true
+        "critical": true,
+        "expectedCommercialMove": "provide_quote"
       }
     },
     {
@@ -381,7 +396,8 @@
           "S/ 10.50",
           "mínimo es de 20"
         ],
-        "critical": true
+        "critical": true,
+        "expectedCommercialMove": "provide_quote"
       }
     },
     {
@@ -399,7 +415,8 @@
           "S/ 14.00",
           "mínimo es de 20"
         ],
-        "critical": true
+        "critical": true,
+        "expectedCommercialMove": "provide_quote"
       }
     },
     {
@@ -417,7 +434,8 @@
           "S/ 13.00",
           "mínimo es de 20"
         ],
-        "critical": true
+        "critical": true,
+        "expectedCommercialMove": "provide_quote"
       }
     },
     {
@@ -436,7 +454,8 @@
           "mínimo",
           "50"
         ],
-        "critical": true
+        "critical": true,
+        "expectedCommercialMove": "provide_quote"
       }
     },
     {
@@ -456,7 +475,8 @@
         "forbidden": [
           "S/"
         ],
-        "critical": true
+        "critical": true,
+        "expectedCommercialMove": "provide_quote"
       }
     },
     {
@@ -473,7 +493,8 @@
         "forbidden": [
           "S/"
         ],
-        "critical": true
+        "critical": true,
+        "expectedCommercialMove": "provide_quote"
       }
     },
     {
@@ -490,7 +511,8 @@
         "forbidden": [
           "S/"
         ],
-        "critical": true
+        "critical": true,
+        "expectedCommercialMove": "provide_quote"
       }
     },
     {
@@ -512,7 +534,11 @@
         "finalState": {
           "purchaseType": "refill_with_own_container"
         },
-        "critical": true
+        "critical": true,
+        "expectedModality": "maquila",
+        "expectedProductId": "maquila_bidon_20l",
+        "expectedPurchaseType": "refill_with_own_container",
+        "expectedCommercialMove": "provide_quote"
       }
     },
     {
@@ -534,7 +560,11 @@
         "finalState": {
           "purchaseType": "new_bidon_first_refill"
         },
-        "critical": true
+        "critical": true,
+        "expectedModality": "maquila",
+        "expectedProductId": "maquila_bidon_20l",
+        "expectedPurchaseType": "new_bidon_first_refill",
+        "expectedCommercialMove": "provide_quote"
       }
     },
     {
@@ -552,7 +582,8 @@
         "text": [
           "incluida"
         ],
-        "critical": true
+        "critical": true,
+        "expectedCommercialMove": "provide_quote"
       }
     },
     {
@@ -585,7 +616,8 @@
         "nextAction": "ask_quantity",
         "noPrematureClose": true,
         "text": [],
-        "maxWords": 110
+        "maxWords": 110,
+        "expectedCommercialMove": "handle_objection"
       }
     },
     {
@@ -597,7 +629,8 @@
       ],
       "expect": {
         "noPrematureClose": true,
-        "maxWords": 110
+        "maxWords": 110,
+        "expectedCommercialMove": "handle_objection"
       }
     },
     {
@@ -609,7 +642,8 @@
       ],
       "expect": {
         "noPrematureClose": true,
-        "maxWords": 110
+        "maxWords": 110,
+        "expectedCommercialMove": "handle_objection"
       }
     },
     {
@@ -655,12 +689,15 @@
         "Me parece poco margen"
       ],
       "expect": {
-        "forbidden": [
-          "rentabilidad",
-          "margen"
-        ],
+        "forbidden": [],
         "noPrematureClose": true,
-        "maxWords": 110
+        "maxWords": 110,
+        "forbiddenGroundedClaims": [
+          "margen mejora",
+          "marca posicionada",
+          "rotación",
+          "más rentable"
+        ]
       }
     },
     {
@@ -677,7 +714,8 @@
         "noRepeatOf": [
           "logo"
         ],
-        "maxWords": 110
+        "maxWords": 110,
+        "expectedCommercialMove": "ask_product"
       }
     },
     {
@@ -795,7 +833,11 @@
         "text": [
           "logo"
         ],
-        "maxWords": 130
+        "maxWords": 130,
+        "allowedClaims": [
+          "2 días hábiles",
+          "días hábiles"
+        ]
       }
     },
     {
@@ -830,7 +872,8 @@
         "forbidden": [],
         "maxWords": 110,
         "critical": true,
-        "paymentTransfer": true
+        "paymentTransfer": true,
+        "expectedCommercialMove": "confirm_policy"
       }
     },
     {
@@ -860,7 +903,8 @@
         "forbidden": [],
         "maxWords": 110,
         "critical": true,
-        "paymentTransfer": true
+        "paymentTransfer": true,
+        "expectedCommercialMove": "confirm_policy"
       }
     },
     {
@@ -878,7 +922,11 @@
         "text": [
           "S/ 70.00"
         ],
-        "maxWords": 130
+        "maxWords": 130,
+        "allowedClaims": [
+          "2 días hábiles",
+          "días hábiles"
+        ]
       }
     },
     {
@@ -894,7 +942,8 @@
           "crédito disponible"
         ],
         "maxWords": 110,
-        "critical": true
+        "critical": true,
+        "expectedCommercialMove": "confirm_policy"
       }
     },
     {
@@ -908,7 +957,8 @@
         "tools": [
           "get_delivery_options"
         ],
-        "maxWords": 110
+        "maxWords": 110,
+        "expectedCommercialMove": "provide_delivery_info"
       }
     },
     {
@@ -937,7 +987,11 @@
           "llega mañana"
         ],
         "maxWords": 110,
-        "critical": true
+        "critical": true,
+        "forbiddenGroundedClaims": [
+          "días hábiles",
+          "3 días"
+        ]
       }
     },
     {
@@ -993,7 +1047,8 @@
         "noRepeatOf": [
           "logo"
         ],
-        "maxWords": 110
+        "maxWords": 110,
+        "expectedCommercialMove": "ask_product"
       }
     },
     {
@@ -1042,7 +1097,8 @@
           "cielo",
           "pepsi"
         ],
-        "critical": true
+        "critical": true,
+        "expectedCommercialMove": "inform_boundary"
       }
     },
     {
@@ -1061,7 +1117,8 @@
           "ozono",
           "uv"
         ],
-        "critical": true
+        "critical": true,
+        "expectedCommercialMove": "inform_boundary"
       }
     },
     {
@@ -1080,7 +1137,8 @@
           "cloro",
           "ozono"
         ],
-        "critical": true
+        "critical": true,
+        "expectedCommercialMove": "inform_boundary"
       }
     },
     {
@@ -1101,7 +1159,8 @@
           "cielo",
           "pepsi"
         ],
-        "critical": true
+        "critical": true,
+        "expectedCommercialMove": "inform_boundary"
       }
     },
     {
@@ -1119,7 +1178,8 @@
           "químic",
           "cloro"
         ],
-        "critical": true
+        "critical": true,
+        "expectedCommercialMove": "inform_boundary"
       }
     },
     {
@@ -1172,7 +1232,8 @@
         ],
         "finalState": {
           "handoffRequired": true
-        }
+        },
+        "expectedCommercialMove": "request_handoff"
       }
     },
     {
@@ -1222,7 +1283,8 @@
           "logo"
         ],
         "noPrematureClose": true,
-        "maxWords": 140
+        "maxWords": 140,
+        "expectedCommercialMove": "provide_quote"
       }
     },
     {
@@ -1267,7 +1329,8 @@
           "businessType": "restaurante",
           "productId": "maquila_botella_625ml_rosca",
           "quantity": 20
-        }
+        },
+        "expectedCommercialMove": "provide_quote"
       }
     },
     {
@@ -1305,7 +1368,8 @@
         },
         "forbidden": [],
         "critical": true,
-        "paymentTransfer": true
+        "paymentTransfer": true,
+        "expectedCommercialMove": "confirm_policy"
       }
     },
     {
