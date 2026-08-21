@@ -185,7 +185,7 @@ test('REPORTE: buildReport y renderMarkdown generan salida legible', () => {
     matrix: categoryMatrix(scenarioResults), turnLatencyMs: [100, 200], aiLatencyMs: [80, 150],
     usage: { requests: 2, inputTokens: 100, outputTokens: 50, totalTokens: 150 }, estimatedCostUSD: 0.01,
   });
-  assert.equal(report.commitSha, 'a656a40');
+  assert.match(report.commitSha, /^[0-9a-f]{7}$/);
   assert.ok(report.latency.turnMs.p50 === 200 || report.latency.turnMs.p50 === 100);
   const md = renderMarkdown(report);
   assert.match(md, /# Reporte de evaluación/);
