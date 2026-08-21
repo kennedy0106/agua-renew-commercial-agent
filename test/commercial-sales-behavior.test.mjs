@@ -5,7 +5,7 @@ import { CommercialToolRegistry } from '../src/ai/commercial-tool-registry.mjs';
 import { CommercialAgent } from '../src/ai/commercial-agent.mjs';
 import { ConversationEngine } from '../src/conversation/conversation-engine.mjs';
 import { InMemoryConversationRepository } from '../src/repository/in-memory-conversation-repository.mjs';
-import { getNextBestAction, suggestSalesStage, SALES_STAGES } from '../src/ai/sales-context.mjs';
+import { getNextBestAction, suggestSalesStage, SALES_STAGES, containerCoherence } from '../src/ai/sales-context.mjs';
 
 function scriptedProvider(responses) {
   let index = 0;
@@ -150,11 +150,37 @@ test('STAGE 4: "300 son muchas" (objeción) → objection_handling', async () =>
   assert.equal(suggestSalesStage({ currentObjection: 'minimum_quantity' }, { action }), 'objection_handling');
 });
 
-test('STAGE 5: acuerdo con datos suficientes → purchase_preparation', async () => {
-  const state = { modality: 'maquila', productId: 'maquila_botella_1l_fliptop', quantity: 20, quoteRequestCreated: true };
+test('STAGE 5: acuerdo con datos suficientes y readiness alta → purchase_preparation', () => {
+  const state = {
+    modality: 'maquila', productId: 'maquila_botella_1l_fliptop', quantity: 20,
+    quoteRequestCreated: true, purchaseReadiness: 'qualified', currentObjection: null, pendingTopic: null,
+  };
   const { action } = getNextBestAction(state);
   assert.equal(action, 'prepare_purchase');
   assert.equal(suggestSalesStage(state, { action }), 'purchase_preparation');
+});
+
+test('STAGE 5b: ready_for_handoff → prepare_purchase, sin handoff automático', () => {
+  const state = {
+    modality: 'maquila', productId: 'maquila_botella_1l_fliptop', quantity: 20,
+    quoteRequestCreated: true, purchaseReadiness: 'ready_for_handoff', currentObjection: null, pendingTopic: null,
+  };
+  const { action } = getNextBestAction(state);
+  assert.equal(action, 'prepare_purchase');
+  assert.notEqual(action, 'handoff');
+  assert.equal(suggestSalesStage(state, { action }), 'purchase_preparation');
+});
+
+test('STAGE 5c: cotización sin readiness alta NO avanza a purchase_preparation', () => {
+  const state = {
+    modality: 'maquila', productId: 'maquila_botella_1l_fliptop', quantity: 20,
+    quoteRequestCreated: true, purchaseReadiness: 'exploring', currentObjection: null, pendingTopic: null,
+    salesStage: 'quotation',
+  };
+  const { action } = getNextBestAction(state);
+  assert.notEqual(action, 'prepare_purchase');
+  assert.equal(action, 'answer_current_question');
+  assert.equal(suggestSalesStage(state, { action }), 'quotation');
 });
 
 test('STAGE: el enum de etapas es el especificado y excluye los viejos', () => {
@@ -277,7 +303,7 @@ test('CASO 10: el siguiente paso no pregunta información ya conocida', () => {
 
 // ── Métricas estructuradas (sección 25) ──
 
-test('MÉTRICAS: el turno expone salesStage, purchaseReadiness, currentObjection y nextBestAction sin texto privado', async () => {
+test('MÉTRICAS: el turno expone contexto inicial y final estructurado sin texto privado', async () => {
   const agent = new CommercialAgent({
     provider: scriptedProvider([
       { content: null, toolCalls: [toolCall('get_quote', { productId: 'maquila_botella_1l_fliptop', quantity: 20 })] },
@@ -286,12 +312,123 @@ test('MÉTRICAS: el turno expone salesStage, purchaseReadiness, currentObjection
     tools: new CommercialToolRegistry({ commercialService: new CommercialService() }),
   });
   const result = await agent.reply({
-    message: 'Quiero 20 paquetes de 1 litro con mi marca', state: { modality: 'maquila', productId: 'maquila_botella_1l_fliptop' }, history: [],
+    message: 'Quiero 20 paquetes de 1 litro con mi marca',
+    state: { modality: 'maquila', productId: 'maquila_botella_1l_fliptop', salesStage: 'quotation', hasLogo: true },
+    history: [],
   });
+  // Pre-turno: cantidad desconocida → ask_quantity.
+  assert.equal(result.metrics.initial_next_best_action, 'ask_quantity');
+  // Post-turno: cantidad conocida y logo confirmado → conserva la etapa (quotation).
+  assert.equal(result.metrics.final_next_best_action, 'answer_current_question');
   assert.equal(result.metrics.sales_stage, 'quotation');
-  assert.equal(result.metrics.next_best_action, 'ask_quantity');
   assert.equal(result.metrics.purchase_readiness, 'exploring');
   assert.equal(result.metrics.current_objection, null);
   assert.equal(result.memory.sales_stage, 'quotation');
-  assert.equal(result.memory.next_best_action, 'ask_quantity');
+  assert.equal(result.memory.next_best_action, 'answer_current_question');
+});
+
+// ── Cierre Bloque B · hallazgos de la auditoría ──
+
+test('DESFASE: la objeción del turno se refleja al final del MISMO turno', async () => {
+  const engine = await createAgentEngine(scriptedProvider([
+    { content: null, toolCalls: [toolCall('update_conversation_memory', { currentObjection: 'minimum_quantity' })] },
+    { content: 'Entiendo la preocupación por el volumen.' },
+  ]));
+  await engine.dispatch({ type: 'submit_text', value: '300 son muchas' });
+  const state = stateOf(engine);
+  assert.equal(state.currentObjection, 'minimum_quantity');
+  assert.equal(state.salesStage, 'objection_handling');
+  assert.equal(getNextBestAction(state).action, 'resolve_objection');
+});
+
+test('LIMPIAR OBJECIÓN: la objeción se resuelve con el mecanismo explícito', async () => {
+  const engine = await createAgentEngine(scriptedProvider([
+    { content: null, toolCalls: [toolCall('update_conversation_memory', { currentObjection: 'minimum_quantity' })] },
+    { content: 'Entendido.' },
+    { content: null, toolCalls: [toolCall('update_conversation_memory', { clearCurrentObjection: true })] },
+    { content: '¡Perfecto! Entonces seguimos.' },
+  ]));
+  await engine.dispatch({ type: 'submit_text', value: '300 son muchas' });
+  assert.equal(stateOf(engine).currentObjection, 'minimum_quantity');
+  await engine.dispatch({ type: 'submit_text', value: 'Ah perfecto, entonces sí me sirve' });
+  const state = stateOf(engine);
+  assert.equal(state.currentObjection, null);
+  assert.notEqual(getNextBestAction(state).action, 'resolve_objection');
+});
+
+test('PENDING TOPIC: se conserva ante preguntas intermedias y se limpia solo al resolverse', async () => {
+  const engine = await createAgentEngine(scriptedProvider([
+    { content: null, toolCalls: [toolCall('update_conversation_memory', { pendingTopic: 'payment_method_confirmation' })] },
+    { content: 'Esa condición la confirma un asesor.' },
+    { content: null, toolCalls: [toolCall('get_product_information', { productId: 'maquila_botella_1l_fliptop' })] },
+    { content: 'La de 1 litro trae 10 botellas por paquete.' },
+    { content: null, toolCalls: [toolCall('update_conversation_memory', { clearPendingTopic: true })] },
+    { content: 'Queda resuelto.' },
+  ]));
+  await engine.dispatch({ type: 'submit_text', value: '¿Cómo se paga?' });
+  assert.equal(stateOf(engine).pendingTopic, 'payment_method_confirmation');
+  // Pregunta intermedia: se responde y el pendingTopic NO se pierde.
+  await engine.dispatch({ type: 'submit_text', value: '¿Cuántas botellas trae el paquete de litro?' });
+  assert.equal(stateOf(engine).pendingTopic, 'payment_method_confirmation');
+  // Resolución explícita del tema.
+  await engine.dispatch({ type: 'submit_text', value: 'Ya me confirmaron el pago' });
+  assert.equal(stateOf(engine).pendingTopic, null);
+  assert.notEqual(getNextBestAction(stateOf(engine)).action, 'resume_pending_topic');
+});
+
+test('PURCHASE TYPE: get_quote con recarga persiste purchaseType y no vuelve a preguntar envases', async () => {
+  const engine = await createAgentEngine(scriptedProvider([
+    { content: null, toolCalls: [toolCall('get_quote', { productId: 'maquila_bidon_20l', quantity: 50, purchaseType: 'refill_with_own_container' })] },
+    { content: 'Para 50 recargas con tus bidones.' },
+    { content: null, toolCalls: [toolCall('get_quote', { productId: 'maquila_bidon_20l', quantity: 50, purchaseType: 'new_bidon_first_refill' })] },
+    { content: 'Para 50 bidones nuevos.' },
+  ]));
+  await engine.dispatch({ type: 'submit_text', value: 'Tengo mis propios bidones, quiero 50 recargas' });
+  const state = stateOf(engine);
+  assert.equal(state.purchaseType, 'refill_with_own_container');
+  assert.notEqual(getNextBestAction(state).action, 'ask_container_status');
+  // Equivalente con bidón nuevo.
+  await engine.dispatch({ type: 'submit_text', value: 'Mejor necesito que me proporcionen los bidones' });
+  assert.equal(stateOf(engine).purchaseType, 'new_bidon_first_refill');
+});
+
+test('FULFILLMENT: una herramienta válida conserva el recojo sin volver a pedirlo', async () => {
+  const engine = await createAgentEngine(scriptedProvider([
+    { content: null, toolCalls: [toolCall('get_quote', { productId: 'maquila_bidon_20l', quantity: 500, purchaseType: 'refill_with_own_container', fulfillment: 'plant_collection' })] },
+    { content: 'Para esa escala el recojo es en planta.' },
+  ]));
+  await engine.dispatch({ type: 'submit_text', value: '500 recargas con mis bidones, recojo en planta' });
+  assert.equal(stateOf(engine).fulfillment, 'plant_collection');
+});
+
+test('COHERENCIA: pares válidos y contradicción resuelta sin estado inválido persistente', async () => {
+  assert.equal(containerCoherence({ hasOwnContainers: true, purchaseType: 'refill_with_own_container' }).valid, true);
+  assert.equal(containerCoherence({ hasOwnContainers: false, purchaseType: 'new_bidon_first_refill' }).valid, true);
+  assert.equal(containerCoherence({ hasOwnContainers: true, purchaseType: 'new_bidon_first_refill' }).valid, false);
+  // Contradicción a través de herramientas: no se persiste como estado válido.
+  const engine = await createAgentEngine(scriptedProvider([
+    { content: null, toolCalls: [
+      toolCall('update_conversation_memory', { hasOwnContainers: true }),
+      toolCall('get_quote', { productId: 'maquila_bidon_20l', quantity: 50, purchaseType: 'new_bidon_first_refill' }),
+    ] },
+    { content: 'Reviso esa condición contigo.' },
+  ]));
+  await engine.dispatch({ type: 'submit_text', value: 'Tengo bidones propios pero quiero bidones nuevos' });
+  const state = stateOf(engine);
+  assert.ok(!(state.hasOwnContainers === true && state.purchaseType === 'new_bidon_first_refill'));
+});
+
+test('NO CIERRE: exploring con cotización no produce prepare_purchase; qualified sí', () => {
+  const exploring = {
+    modality: 'maquila', productId: 'maquila_botella_1l_fliptop', quantity: 20,
+    quoteRequestCreated: true, purchaseReadiness: 'exploring', currentObjection: null, pendingTopic: null,
+  };
+  assert.notEqual(getNextBestAction(exploring).action, 'prepare_purchase');
+  const qualified = {
+    ...exploring, purchaseReadiness: 'qualified',
+  };
+  assert.equal(getNextBestAction(qualified).action, 'prepare_purchase');
+  // Datos incompletos bloquean incluso con readiness alta.
+  const incomplete = { ...qualified, quantity: null };
+  assert.notEqual(getNextBestAction(incomplete).action, 'prepare_purchase');
 });

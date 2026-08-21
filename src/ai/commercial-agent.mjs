@@ -1,4 +1,4 @@
-import { getNextBestAction, suggestSalesStage } from './sales-context.mjs';
+import { getNextBestAction, suggestSalesStage, applyToolMemoryToState } from './sales-context.mjs';
 
 function compactMemory(state = {}) {
   return {
@@ -175,8 +175,8 @@ export class CommercialAgent {
       'Cuando la persona pide información de forma general o solo muestra interés (por ejemplo “quiero información”, “¿qué ofrecen?”, “cuéntame de ustedes”, “no conozco el servicio”), presenta de inmediato el panorama del negocio usando get_business_overview: las 3 rutas (maquila con tu propia marca, distribución de la marca Agua ReNew y compra directa) en una lista breve, e invita a elegir una. No te limites a preguntar “¿qué información buscas?” sin aportar nada.',
       'No eres un formulario: conserva el hilo, admite interrupciones y cambios de tema. Si el prospecto hace una pregunta directa o cambia de tema, responde esa pregunta primero; el siguiente paso sugerido se retoma después si sigue siendo natural. Usa la memoria para entender el negocio, necesidad e interés. Puedes actualizarla solo con datos explícitos usando update_conversation_memory.',
       'NO REPITAS: nunca preguntes nuevamente un dato ya confirmado en memoria (por ejemplo, si has_logo es true no preguntes si tiene logo; si product_id está definido no preguntes qué presentación quiere; si quantity está definida no pidas la cantidad otra vez), salvo contradicción, cambio explícito del prospecto o confirmación necesaria para una cotización.',
-      'OBJECIONES: cuando exista una objeción activa (current_objection), responde primero la objeción, refuerza valor cuando sea natural, no saltes al cierre y deja un siguiente paso pequeño.',
-      'NO CIERRES PREMATURAMENTE: no solicites cierre ni handoff por compra solo porque el prospecto preguntó precio, pidió una cotización, mostró interés o respondió una presentación. Antes de cualquier propuesta de cierre considera sales_stage, purchase_readiness, pending_topic, current_objection y los datos faltantes.',
+      'OBJECIONES: cuando exista una objeción activa (current_objection), responde primero la objeción, refuerza valor cuando sea natural, no saltes al cierre y deja un siguiente paso pequeño. Cuando el prospecto confirma que la objeción quedó resuelta, usa update_conversation_memory con clearCurrentObjection; igual con clearPendingTopic cuando un tema pendiente se resuelve. Omitir esos campos conserva el valor existente.',
+      'NO CIERRES PREMATURAMENTE: no solicites cierre ni handoff por compra solo porque el prospecto preguntó precio, pidió una cotización, mostró interés o respondió una presentación. Una cotización por sí sola no es intención de compra: prepare_purchase solo corresponde cuando hay señales suficientes (sin objeciones, sin temas pendientes y readiness alta). Antes de cualquier propuesta de cierre considera sales_stage, purchase_readiness, pending_topic, current_objection y los datos faltantes.',
       'ADAPTA EL ARGUMENTO AL CASO: cuando el prospecto explica para qué quiere el producto (use_case o business_type), traduce el producto en un beneficio relevante para su situación (por ejemplo, taxista → experiencia del pasajero y recordación; restaurante → presentación e identidad; distribuidor → rotación y producto listo para comercializar). No inventes rentabilidades, resultados garantizados ni hechos técnicos no documentados.',
       'Para cualquier hecho comercial, beneficio, precio, escala, mínimo, producto, delivery o servicio usa una herramienta de negocio aprobada. No inventes precios, promociones, descuentos, stock, rentabilidad, urgencia, crédito ni condiciones. Un resultado partial, input_required, blocked o not_available es una situación comercial para explicar, no un error técnico.',
       'El sistema compone automáticamente los precios, totales, mínimos, contenido de paquete e inclusión de etiqueta desde el resultado de las herramientas. Cuando uses get_quote o get_service_information, no escribas montos, totales, mínimos ni condiciones en tu respuesta: limítate a una transición breve y una sola pregunta de cierre; los hechos correctos se adjuntan solos. Un resultado below_minimum es una situación comercial: explica el mínimo vigente e invita a ajustar la cantidad, sin derivar por defecto.',
@@ -192,19 +192,13 @@ export class CommercialAgent {
 
   async reply({ message, state, history }) {
     const started = performance.now();
-    // Evaluación estructurada del turno (sin exponer razonamiento textual):
-    // siguiente mejor acción y etapa comercial sugeridas desde el estado.
-    const nextBestAction = getNextBestAction(state);
-    const salesStage = suggestSalesStage(state, nextBestAction);
-    const memory = compactMemory({ ...state, salesStage });
-    const salesContext = {
-      sales_stage: salesStage,
-      purchase_readiness: state.purchaseReadiness ?? 'exploring',
-      current_objection: state.currentObjection ?? null,
-      next_best_action: nextBestAction.action,
-    };
+    // Evaluación estructurada previa al turno (guía para el modelo): siguiente
+    // mejor acción y etapa sugeridas desde el estado ANTERIOR al mensaje.
+    const initialNextBestAction = getNextBestAction(state);
+    const initialSalesStage = suggestSalesStage(state, initialNextBestAction);
+    const memory = compactMemory({ ...state, salesStage: initialSalesStage });
     const turns = history.slice(-10).map((turn) => ({ role: turn.role === 'bot' ? 'assistant' : 'user', content: String(turn.text).slice(0, 700) }));
-    const initialMessages = [{ role: 'system', content: this.systemPrompt(memory, nextBestAction) }, ...turns, { role: 'user', content: message }];
+    const initialMessages = [{ role: 'system', content: this.systemPrompt(memory, initialNextBestAction) }, ...turns, { role: 'user', content: message }];
     const definitions = this.tools.listDefinitions();
     let first = await this.provider.complete({
       messages: initialMessages,
@@ -245,12 +239,37 @@ export class CommercialAgent {
       outputTokens: (initialDecision.outputTokens ?? 0) + (protocolRetryResult?.outputTokens ?? 0) + (protocolRecovery ? first.outputTokens ?? 0 : 0),
       toolLatencyMs: 0, tools: [],
     };
+    // Recalculo determinístico del contexto final del turno (sin llamada al
+    // LLM): aplica la memoria de las herramientas ejecutadas sobre el estado y
+    // vuelve a decidir etapa y siguiente mejor acción sobre ese estado final.
+    const buildFinalContext = (toolsList) => {
+      const finalState = applyToolMemoryToState(state, toolsList);
+      const finalNextBestAction = getNextBestAction(finalState);
+      const finalSalesStage = suggestSalesStage(finalState, finalNextBestAction);
+      return {
+        finalState,
+        context: {
+          initial_next_best_action: initialNextBestAction.action,
+          final_next_best_action: finalNextBestAction.action,
+          sales_stage: finalSalesStage,
+          purchase_readiness: finalState.purchaseReadiness ?? 'exploring',
+          current_objection: finalState.currentObjection ?? null,
+        },
+      };
+    };
+    const finalMemory = (context) => ({
+      ...memory,
+      sales_stage: context.sales_stage,
+      next_best_action: context.final_next_best_action,
+      initial_next_best_action: context.initial_next_best_action,
+    });
     if (protocolFailure) return { success: false, errorType: 'tool_protocol_invalid', trace, metrics };
     if (!first.toolCalls?.length) {
       const guarded = this.tools.exposurePolicy.guardCustomerText(first.content?.trim() || '¿Qué te gustaría revisar?');
+      const { context: salesContext } = buildFinalContext([]);
       const diagnostics = { ...responseDiagnostics(guarded.text), complexMarkdown: guarded.complexMarkdown, restrictedOutputSuppressed: guarded.restrictedSuppressed, multipleQuestionsSuppressed: guarded.multipleQuestionsSuppressed ?? false, handoffCategory: null, ...salesContext };
       trace.push({ phase: 'response_policy', ...diagnostics });
-      return { success: true, text: guarded.text, memory: { ...memory, next_best_action: nextBestAction.action }, trace, metrics: { ...metrics, ...diagnostics } };
+      return { success: true, text: guarded.text, memory: finalMemory(salesContext), trace, metrics: { ...metrics, ...diagnostics } };
     }
     const calls = first.toolCalls.slice(0, 4);
     const toolMessages = [];
@@ -281,7 +300,7 @@ export class CommercialAgent {
       }
     }
     const final = await this.provider.complete({
-      messages: [{ role: 'system', content: this.systemPrompt(memory, nextBestAction) }, ...turns, { role: 'user', content: message }, ...toolMessages],
+      messages: [{ role: 'system', content: this.systemPrompt(memory, initialNextBestAction) }, ...turns, { role: 'user', content: message }, ...toolMessages],
       tools: [], toolChoice: 'none',
     });
     metrics.aiCallCount += 1; metrics.aiLatencyMs += final.latencyMs ?? 0; metrics.inputTokens += final.inputTokens ?? 0; metrics.outputTokens += final.outputTokens ?? 0;
@@ -305,11 +324,11 @@ export class CommercialAgent {
     }
     const guarded = this.tools.exposurePolicy.guardCustomerText(groundedText);
     const audits = metrics.tools.map((tool) => tool.exposureAudit).filter(Boolean);
+    const { context: salesContext } = buildFinalContext(metrics.tools);
     const diagnostics = { ...responseDiagnostics(guarded.text, audits), complexMarkdown: guarded.complexMarkdown, restrictedOutputSuppressed: guarded.restrictedSuppressed, multipleQuestionsSuppressed: guarded.multipleQuestionsSuppressed ?? false, toolResultGroundingAdded: Boolean(facts), quoteResponseComposedLocally: Boolean(facts), handoffCategory: handoff?.context?.handoff_category ?? null, ...salesContext };
     trace.push({ phase: 'response_policy', ...diagnostics });
-    const finalMemory = { ...memory, next_best_action: nextBestAction.action };
     return {
-      success: Boolean(guarded.text), text: guarded.text, memory: finalMemory, handoff, trace,
+      success: Boolean(guarded.text), text: guarded.text, memory: finalMemory(salesContext), handoff, trace,
       metrics: { ...metrics, ...diagnostics },
       totalLatencyMs: Math.round(performance.now() - started),
     };

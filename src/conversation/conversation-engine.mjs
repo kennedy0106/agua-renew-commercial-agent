@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { CommercialService } from '../commercial/commercial-service.mjs';
 import { AIResponseComposer } from '../ai/ai-response-composer.mjs';
 import { CommercialAdvisorVoice } from '../ai/commercial-advisor-voice.mjs';
+import { getNextBestAction, suggestSalesStage, applyToolMemoryToState } from '../ai/sales-context.mjs';
 
 const MODALITY_ORDER = ['maquila', 'distribution_agua_renew', 'final_customer'];
 
@@ -23,7 +24,7 @@ function initialState(mode = 'deterministic') {
     labelRequirements: null, paymentStatus: null, currentObjection: null, sampleInterest: null,
     purchaseReadiness: 'exploring',
     questionsResolved: [], pendingTopic: null, requestedInformation: [], socialOpeningPending: false,
-    salesStage: 'discovery', activeIntent: null, lastAssistantAct: null, lastTopic: null, lastReferencedProduct: null, offeredOptions: [], mode,
+    salesStage: 'discovery', nextBestAction: null, activeIntent: null, lastAssistantAct: null, lastTopic: null, lastReferencedProduct: null, offeredOptions: [], mode,
   };
 }
 
@@ -476,12 +477,12 @@ export class ConversationEngine {
         });
         this.state.quoteRequestCreated = true;
       }
-      // Una cotización entregada implica que la objeción activa dejó de bloquear:
-      // se limpia salvo que el modelo la haya re-afirmado explícitamente este turno.
-      const reassertedObjection = (result.metrics?.tools ?? []).some(
-        (tool) => tool.name === 'update_conversation_memory' && tool.args?.currentObjection,
-      );
-      if (priceTool && !reassertedObjection) this.state.currentObjection = null;
+      // Recalculo determinístico del contexto FINAL del turno (sin llamada al
+      // LLM) sobre el estado ya actualizado; persiste la etapa y la siguiente
+      // acción para el siguiente mensaje.
+      const finalNextBestAction = getNextBestAction(this.state);
+      this.state.salesStage = suggestSalesStage(this.state, finalNextBestAction);
+      this.state.nextBestAction = finalNextBestAction.action;
       const prepared = result.metrics?.tools?.find((tool) => tool.name === 'prepare_handoff')?.result?.data?.lead_summary ?? null;
       if (result.handoff) {
         if (prepared) result.handoff.context = { ...(result.handoff.context ?? {}), lead_summary: prepared };
@@ -498,34 +499,13 @@ export class ConversationEngine {
     }
   }
 
+  /** Aplica la memoria de las herramientas del turno sobre el estado (función
+   * pura en sales-context): solo valores validados, mecanismos explícitos de
+   * limpieza (clearCurrentObjection/clearPendingTopic), persistencia de
+   * purchaseType/fulfillment, resolución de objeción por cotización y
+   * coherencia envase/tipo de compra. */
   applyAgentToolMemory(tools) {
-    for (const tool of tools) {
-      const args = tool.args ?? {};
-      if (args.productId) this.state.productId = args.productId;
-      if (Number.isInteger(args.quantity)) this.state.quantity = args.quantity;
-      if (args.district) this.state.district = args.district;
-      if (args.modality) this.state.modality = args.modality;
-      if (args.productId) this.state.lastReferencedProduct = args.productId;
-      if (args.businessType) this.state.businessType = args.businessType;
-      if (args.customerGoal) this.state.customerGoal = args.customerGoal;
-      if (args.useCase) this.state.useCase = args.useCase;
-      if (args.experienceLevel) this.state.experienceLevel = args.experienceLevel;
-      if (args.lastTopic) this.state.lastTopic = args.lastTopic;
-      if (args.commercialIntent) this.state.commercialIntent = args.commercialIntent;
-      if (typeof args.hasBrand === 'boolean') this.state.hasBrand = args.hasBrand;
-      if (args.brandName) this.state.brandName = args.brandName;
-      if (typeof args.hasLogo === 'boolean') this.state.hasLogo = args.hasLogo;
-      if (typeof args.needsDesign === 'boolean') this.state.needsDesign = args.needsDesign;
-      if (typeof args.hasOwnContainers === 'boolean') this.state.hasOwnContainers = args.hasOwnContainers;
-      if (args.labelRequirements) this.state.labelRequirements = args.labelRequirements;
-      if (args.paymentStatus) this.state.paymentStatus = args.paymentStatus;
-      if (args.currentObjection) this.state.currentObjection = args.currentObjection;
-      if (typeof args.sampleInterest === 'boolean') this.state.sampleInterest = args.sampleInterest;
-      if (args.purchaseReadiness) this.state.purchaseReadiness = args.purchaseReadiness;
-      if (args.salesStage) this.state.salesStage = args.salesStage;
-      if (Array.isArray(args.questionsResolved)) this.state.questionsResolved = [...new Set([...this.state.questionsResolved, ...args.questionsResolved])];
-      if (args.pendingTopic) this.state.pendingTopic = args.pendingTopic;
-    }
+    this.state = applyToolMemoryToState(this.state, tools);
   }
 
   /** Aplica la memoria compacta determinística del agente sin sobreescribir
