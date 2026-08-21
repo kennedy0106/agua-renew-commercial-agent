@@ -291,3 +291,26 @@ test('un pedido bajo el mínimo se compone como situación comercial sin handoff
   assert.match(result.text, /cada paquete contiene 15 botellas/);
   assert.equal(result.metrics.toolResultGroundingAdded, true);
 });
+
+// ── Cierre Bloque A: vista efectiva, auditoría interna y etiqueta 20 L ──
+
+test('CASO B: restrictedDetailsRemoved no llega al modelo en get_product_information ni get_quote', () => {
+  const registry = new CommercialToolRegistry({ commercialService: new CommercialService() });
+  const product = registry.executeForAgent('get_product_information', { productId: 'maquila_botella_1l_fliptop' });
+  assert.equal(JSON.stringify(product.result).includes('restrictedDetailsRemoved'), false);
+  assert.equal(JSON.stringify(product.result.data).includes('removed'), false);
+  const quote = registry.executeForAgent('get_quote', { productId: 'maquila_botella_1l_fliptop', quantity: 30 });
+  assert.equal(JSON.stringify(quote.result).includes('restrictedDetailsRemoved'), false);
+});
+
+test('la exclusión de etiqueta de recarga 20 L se verbaliza determinísticamente', async () => {
+  const provider = scriptedProvider([
+    { content: null, toolCalls: [toolCall('get_quote', { productId: 'maquila_bidon_20l', quantity: 50, purchaseType: 'refill_with_own_container', fulfillment: 'plant_collection' })] },
+    { content: '¿Te gustaría que revisemos otra cantidad?' },
+  ]);
+  const result = await new CommercialAgent({ provider, tools: new CommercialToolRegistry({ commercialService: new CommercialService() }) })
+    .reply({ message: 'Quiero 50 recargas con mis propios bidones', state: {}, history: [] });
+  assert.match(result.text, /S\/ 6\.00 por unidad/);
+  assert.match(result.text, /El pedido mínimo es de 50 unidades/);
+  assert.match(result.text, /No incluye etiqueta personalizada/);
+});

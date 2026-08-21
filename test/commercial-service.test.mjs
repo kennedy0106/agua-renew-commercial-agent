@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { CommercialService, HANDOFF_MESSAGE } from '../src/commercial/commercial-service.mjs';
+import { CommercialExposurePolicy } from '../src/ai/commercial-exposure-policy.mjs';
 
 const service = new CommercialService();
 
@@ -420,4 +421,48 @@ test('CASO 8: la forma de pago general de maquila no está documentada y no reut
   const logo = service.get_additional_service('Creación de logotipo profesional — Pack Básico');
   assert.equal(logo.status, 'ok');
   assert.match(logo.data.payment, /50%/);
+});
+
+test('CASO A: el mínimo vigente 50 del bidón 20 L es consistente en todas las operaciones', () => {
+  // get_product()
+  assert.equal(service.get_product('maquila_bidon_20l').data.minimum.value, 50);
+  // list_products() sin y con modalidad
+  assert.equal(service.list_products().data.find((p) => p.id === 'maquila_bidon_20l').minimum.value, 50);
+  assert.equal(service.list_products({ modality: 'maquila' }).data.find((p) => p.id === 'maquila_bidon_20l').minimum.value, 50);
+  // get_product_comparison()
+  const comparison = service.get_product_comparison({ modality: 'maquila', requestedInformation: ['minimums'] });
+  assert.equal(comparison.data.products.find((p) => p.id === 'maquila_bidon_20l').minimum.value, 50);
+  // get_quote() en ambos tipos de compra y en below_minimum
+  assert.equal(service.get_purchase_price({ productId: 'maquila_bidon_20l', purchaseType: 'new_bidon_first_refill', quantity: 50 }).data.minimum.value, 50);
+  assert.equal(service.get_purchase_price({ productId: 'maquila_bidon_20l', purchaseType: 'refill_with_own_container', quantity: 50 }).data.minimum.value, 50);
+  assert.equal(service.get_purchase_price({ productId: 'maquila_bidon_20l', quantity: 30 }).data.minimum.value, 50);
+  // la fuente documental permanece intacta (el override no la muta)
+  const sourceProduct = service.data.products.maquila.find((p) => p.id === 'maquila_bidon_20l');
+  assert.equal(sourceProduct.minimum, undefined);
+});
+
+test('CASO C: inclusión técnica filtrada no llega al modelo y queda registrada en audit.restrictedFieldsRemoved', () => {
+  const policy = new CommercialExposurePolicy();
+  const product = service.get_product('maquila_botella_1l_fliptop').data;
+  const { result, audit } = policy.project({
+    toolName: 'get_product_information',
+    result: { status: 'ok', data: product },
+  });
+  const payload = JSON.stringify(result.data);
+  assert.equal(payload.includes('Ósmosis'), false);
+  assert.equal(payload.includes('ozono'), false);
+  assert.equal(payload.includes('restrictedDetailsRemoved'), false);
+  assert.ok(audit.restrictedFieldsRemoved.some((path) => path.startsWith('inclusions[')));
+});
+
+test('CASO D: maquila 20 L con envases propios (50): precio, mínimo 50, etiqueta personalizada excluida', () => {
+  const result = service.get_purchase_price({
+    productId: 'maquila_bidon_20l', purchaseType: 'refill_with_own_container',
+    fulfillment: 'plant_collection', quantity: 50,
+  });
+  assert.equal(result.status, 'ok');
+  assert.equal(result.data.tier.price.amount_pen, 6);
+  assert.equal(result.data.minimum.value, 50);
+  assert.equal(result.data.label_included, false);
+  assert.deepEqual(result.data.exclusions, ['etiqueta personalizada']);
 });

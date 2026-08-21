@@ -57,10 +57,9 @@ function productSummary(product, { includeContext = false } = {}) {
   };
 }
 
-function safeProduct(product) {
-  const removed = [];
+function safeProduct(product, removed = []) {
   const inclusions = Array.isArray(product.inclusions)
-    ? withoutRestricted(copy(product.inclusions), removed)
+    ? withoutRestricted(copy(product.inclusions), removed, 'inclusions')
     : [];
   return {
     ...productSummary(product, { includeContext: true }),
@@ -69,14 +68,12 @@ function safeProduct(product) {
     inclusions,
     label_included: product.label_included ?? null,
     purchase_types: Array.isArray(product.purchase_types) ? copy(product.purchase_types) : null,
-    restrictedDetailsRemoved: removed,
   };
 }
 
-function safeQuote(data) {
-  const removed = [];
+function safeQuote(data, removed = []) {
   const inclusions = Array.isArray(data.inclusions)
-    ? withoutRestricted(copy(data.inclusions), removed)
+    ? withoutRestricted(copy(data.inclusions), removed, 'inclusions')
     : [];
   return {
     product_id: data.product_id,
@@ -161,7 +158,7 @@ export class CommercialExposurePolicy {
       };
       audit.factsAllowed = ['id', 'description', 'products.summary'];
     } else if (toolName === 'get_product_information') {
-      base.data = result.data ? safeProduct(result.data) : null;
+      base.data = result.data ? safeProduct(result.data, audit.restrictedFieldsRemoved) : null;
       audit.factsAllowed = ['id', 'name', 'modality', 'unit', 'package', 'minimum', 'collection', 'excludes', 'inclusions', 'label_included', 'purchase_types'];
     } else if (toolName === 'get_service_information') {
       const data = result.data ?? {};
@@ -175,7 +172,7 @@ export class CommercialExposurePolicy {
       audit.exposureLevel = LEVELS.CONTEXTUAL_COMMERCIAL;
       audit.factsAllowed = ['name', 'description', 'standard_price', 'policy', 'delivery_time'];
     } else if (toolName === 'get_quote') {
-      base.data = result.data ? safeQuote(result.data) : null;
+      base.data = result.data ? safeQuote(result.data, audit.restrictedFieldsRemoved) : null;
       for (const key of ['required', 'allowed_purchase_types', 'allowed_fulfillments', 'current_fulfillment', 'next_action']) {
         if (result[key] !== undefined) base[key] = copy(result[key]);
       }

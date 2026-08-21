@@ -148,6 +148,11 @@ export class CommercialService {
     return null;
   }
 
+  /** Exclusiones de etiqueta derivadas de la regla vigente (no de texto libre). */
+  labelExclusions(productId, purchaseType = null) {
+    return this.labelIncluded(productId, purchaseType) === false ? ['etiqueta personalizada'] : [];
+  }
+
   get_payment_policy() {
     const policy = this.overrides.payment_policy ?? {};
     return success(policy);
@@ -194,17 +199,21 @@ export class CommercialService {
     return success([...new Set(this.data.suggested_public_sale_prices.map((item) => item.product))]);
   }
 
-  list_products({ modality } = {}) {
-    if (modality && !this.data.products[modality]) {
-      return notFound('Modalidad comercial', modality);
+  /** Vista efectiva del catálogo: productos con las reglas vigentes aplicadas.
+   * Única representación usada por toda operación comercial pública. La fuente
+   * documental (this.data.products) permanece intacta. */
+  effectiveProducts(modality = null) {
+    if (modality) {
+      if (!this.data.products[modality]) return null;
+      return [...this.productsById.values()].filter((product) => product.modality === modality);
     }
+    return [...this.productsById.values()];
+  }
 
-    const entries = modality
-      ? this.data.products[modality]
-      : Object.entries(this.data.products).flatMap(([productModality, products]) =>
-          products.map((product) => ({ ...product, modality: productModality })),
-        );
-    return success(entries);
+  list_products({ modality } = {}) {
+    const entries = this.effectiveProducts(modality);
+    if (!entries) return notFound('Modalidad comercial', modality);
+    return success(entries.map((product) => ({ ...product })));
   }
 
   /**
@@ -212,13 +221,14 @@ export class CommercialService {
    * It deliberately does not select a tier or calculate a price when quantity is required.
    */
   get_product_comparison({ modality, requestedInformation = [] } = {}) {
-    if (!this.data.products[modality]) return notFound('Modalidad comercial', modality);
+    const effective = this.effectiveProducts(modality);
+    if (!effective) return notFound('Modalidad comercial', modality);
     const allowedInformation = new Set(['prices', 'minimums']);
     if (!Array.isArray(requestedInformation) || requestedInformation.length === 0 ||
       requestedInformation.some((item) => !allowedInformation.has(item))) {
       return { status: 'invalid_input', field: 'requestedInformation', message: 'La información solicitada no es válida.' };
     }
-    const products = this.data.products[modality].map((product) => {
+    const products = effective.map((product) => {
       const exactPrice = product.price ? copy(product.price) : null;
       const priceRequiresContext = !exactPrice && Boolean(product.tiers || product.prices || product.offers);
       return {
@@ -313,7 +323,7 @@ export class CommercialService {
             price: { ...copy(newBidon.price) },
             minimum: copy(minimum),
             inclusions: ['envase', 'primera recarga'],
-            exclusions: Array.isArray(newBidon.excludes) ? copy(newBidon.excludes) : [],
+            exclusions: this.labelExclusions(productId, 'new_bidon_first_refill'),
             label_included: this.labelIncluded(productId, 'new_bidon_first_refill'),
             fulfillment: 'plant_collection',
             collection: 'recojo en planta',
@@ -353,6 +363,7 @@ export class CommercialService {
             tier,
             minimum: copy(minimum),
             label_included: this.labelIncluded(productId, 'refill_with_own_container'),
+            exclusions: this.labelExclusions(productId, 'refill_with_own_container'),
             fulfillment: fulfillment ?? 'plant_collection_or_authorized_collection_point',
           })
         : { status: 'input_required', required: ['quantity'] };
