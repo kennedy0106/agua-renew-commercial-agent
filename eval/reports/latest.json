@@ -1,0 +1,470 @@
+{
+  "runId": "run-deepseek_flash_v4-mt37tide",
+  "timestamp": "2026-08-21T17:28:17.466Z",
+  "commitSha": "a656a40",
+  "evalDatasetVersion": 1,
+  "model": {
+    "key": "deepseek_flash_v4",
+    "label": "DeepSeek Flash V4",
+    "provider": "deepseek",
+    "modelId": "env",
+    "pricing": {
+      "inputPer1M": 0.27,
+      "outputPer1M": 1.1,
+      "note": "Referencial — ajustar a tarifas vigentes (config externa, no código)"
+    }
+  },
+  "scenariosTotal": 81,
+  "scenariosWithErrors": 0,
+  "summary": {
+    "commercial_fact_accuracy": {
+      "pct": 84,
+      "pass": 68,
+      "total": 81,
+      "criticalFailures": 0,
+      "threshold": 100,
+      "met": false
+    },
+    "price_accuracy": {
+      "pct": 100,
+      "pass": 81,
+      "total": 81,
+      "criticalFailures": 0,
+      "threshold": 100,
+      "met": true
+    },
+    "minimum_accuracy": {
+      "pct": 100,
+      "pass": 81,
+      "total": 81,
+      "criticalFailures": 0,
+      "threshold": 100,
+      "met": true
+    },
+    "policy_accuracy": {
+      "pct": 100,
+      "pass": 81,
+      "total": 81,
+      "criticalFailures": 0,
+      "threshold": 100,
+      "met": true
+    },
+    "memory_accuracy": {
+      "pct": 82.7,
+      "pass": 67,
+      "total": 81,
+      "criticalFailures": 0,
+      "threshold": 100,
+      "met": false
+    },
+    "no_repetition": {
+      "pct": 98.8,
+      "pass": 80,
+      "total": 81,
+      "criticalFailures": 0,
+      "threshold": 98,
+      "met": true
+    },
+    "tool_selection_accuracy": {
+      "pct": 88.9,
+      "pass": 72,
+      "total": 81,
+      "criticalFailures": 0,
+      "threshold": 97,
+      "met": false
+    },
+    "next_step_quality": {
+      "pct": 98.8,
+      "pass": 80,
+      "total": 81,
+      "criticalFailures": 0,
+      "threshold": 90,
+      "met": true
+    },
+    "premature_close_avoidance": {
+      "pct": 100,
+      "pass": 81,
+      "total": 81,
+      "criticalFailures": 0,
+      "threshold": 95,
+      "met": true
+    },
+    "restricted_information_safety": {
+      "pct": 98.8,
+      "pass": 80,
+      "total": 81,
+      "criticalFailures": 1,
+      "threshold": 100,
+      "met": false
+    },
+    "channel_compliance": {
+      "pct": 100,
+      "pass": 81,
+      "total": 81,
+      "criticalFailures": 0,
+      "threshold": 100,
+      "met": true
+    },
+    "tone_consistency": {
+      "pct": 98.8,
+      "pass": 80,
+      "total": 81,
+      "criticalFailures": 0,
+      "threshold": 90,
+      "met": true
+    },
+    "brevity": {
+      "pct": 98.8,
+      "pass": 80,
+      "total": 81,
+      "criticalFailures": 0,
+      "threshold": 90,
+      "met": true
+    },
+    "naturalness": {
+      "pct": 100,
+      "pass": 81,
+      "total": 81,
+      "criticalFailures": 0,
+      "threshold": 85,
+      "met": true
+    },
+    "sales_orientation": {
+      "pct": 100,
+      "pass": 81,
+      "total": 81,
+      "criticalFailures": 0,
+      "threshold": 90,
+      "met": true
+    },
+    "objection_handling": {
+      "pct": 100,
+      "pass": 81,
+      "total": 81,
+      "criticalFailures": 0,
+      "threshold": 85,
+      "met": true
+    }
+  },
+  "globalScore": 97,
+  "criticalFailures": [
+    {
+      "scenarioId": "F006",
+      "category": "objections",
+      "metric": "restricted_information_safety",
+      "input": "Me parece poco margen",
+      "output": "Entiendo su punto, el margen siempre es clave al evaluar. Le comento que en maquila el margen mejora conforme aumenta el volumen, y en distribución de Agua ReNew el producto ya tiene marca posicionada, lo que facilita la rotación.\n\n¿Qué presentación está evaluando y qué volumen maneja aproximadamente? Con esos datos le preparo una cotización para que vea los números exactos y decidamos la mejor ru",
+      "reason": "término restringido: margen"
+    }
+  ],
+  "categoryMatrix": {
+    "first_contact": {
+      "pass": 4,
+      "partial": 1,
+      "fail": 0,
+      "critical": 0
+    },
+    "discovery": {
+      "pass": 3,
+      "partial": 2,
+      "fail": 0,
+      "critical": 0
+    },
+    "maquila": {
+      "pass": 3,
+      "partial": 3,
+      "fail": 0,
+      "critical": 0
+    },
+    "distribution": {
+      "pass": 1,
+      "partial": 2,
+      "fail": 0,
+      "critical": 0
+    },
+    "quotation": {
+      "pass": 5,
+      "partial": 4,
+      "fail": 3,
+      "critical": 0
+    },
+    "objections": {
+      "pass": 4,
+      "partial": 1,
+      "fail": 1,
+      "critical": 1
+    },
+    "memory": {
+      "pass": 1,
+      "partial": 0,
+      "fail": 5,
+      "critical": 0
+    },
+    "topic_change": {
+      "pass": 3,
+      "partial": 0,
+      "fail": 0,
+      "critical": 0
+    },
+    "payment": {
+      "pass": 5,
+      "partial": 0,
+      "fail": 0,
+      "critical": 0
+    },
+    "delivery": {
+      "pass": 4,
+      "partial": 0,
+      "fail": 0,
+      "critical": 0
+    },
+    "brand_logo": {
+      "pass": 3,
+      "partial": 0,
+      "fail": 2,
+      "critical": 0
+    },
+    "restricted": {
+      "pass": 4,
+      "partial": 1,
+      "fail": 0,
+      "critical": 0
+    },
+    "close_handoff": {
+      "pass": 4,
+      "partial": 1,
+      "fail": 0,
+      "critical": 0
+    },
+    "multi_turn": {
+      "pass": 0,
+      "partial": 0,
+      "fail": 5,
+      "critical": 0
+    },
+    "naturalness_channel": {
+      "pass": 6,
+      "partial": 0,
+      "fail": 0,
+      "critical": 0
+    }
+  },
+  "latency": {
+    "turnMs": {
+      "p50": 3672,
+      "p90": 5303,
+      "p95": 7394,
+      "mean": 4133,
+      "count": 106
+    },
+    "aiMs": {
+      "p50": 4022,
+      "p90": 9007,
+      "p95": 10634,
+      "mean": 5403,
+      "count": 81
+    },
+    "perTurnAiMs": {
+      "p50": 4022,
+      "p90": 9007,
+      "p95": 10634,
+      "mean": 5403,
+      "count": 81
+    }
+  },
+  "usage": {
+    "requests": 106,
+    "inputTokens": 896871,
+    "outputTokens": 25755,
+    "totalTokens": 922626,
+    "estimatedCostUSD": 0.2705
+  },
+  "tokenization": {
+    "tokensPerTurn": 8704,
+    "tokensPerConversation": 11390,
+    "costPerConversation": 0.0033,
+    "costPer1000Conversations": 270.49
+  },
+  "topFailures": [
+    {
+      "scenarioId": "F006",
+      "category": "objections",
+      "input": "Me parece poco margen",
+      "output": "Entiendo su punto, el margen siempre es clave al evaluar. Le comento que en maquila el margen mejora conforme aumenta el volumen, y en distribución de Agua ReNew el producto ya tiene marca posicionada, lo que facilita la rotación.\n\n¿Qué presentación está evaluando y qué volumen maneja aproximadamente? Con esos datos le preparo una cotización para que vea los números exactos y decidamos la mejor ru",
+      "violations": [
+        {
+          "metric": "restricted_information_safety",
+          "reason": "término restringido: margen"
+        }
+      ]
+    },
+    {
+      "scenarioId": "E002",
+      "category": "quotation",
+      "input": "Quiero 60 paquetes de 625 ml",
+      "output": "De acuerdo. Botella PET de 625 ml tapa rosca con marca propia: Para 60 paquetes, el precio aplicable es S/ 10.50 por paquete (S/ 0.70 por botella). El total es S/ 630.00. Cada paquete contiene 15 botellas. El pedido mínimo es de 20 paquetes. La etiqueta personalizada está incluida.\n\nBotella Agua ReNew de 625 ml tapa rosca: Para 60 paquetes, el precio aplicable es S/ 9.00 por paquete (S/ 0.60 por b",
+      "violations": [
+        {
+          "metric": "brevity",
+          "reason": "turno 1: 94 palabras (límite 90)"
+        }
+      ]
+    },
+    {
+      "scenarioId": "E009",
+      "category": "quotation",
+      "input": "Quiero 50 bidones, tengo mis propios envases",
+      "output": "La herramienta requiere un purchaseType. Como el prospecto tiene sus propios envases, el tipo sería \"refill_with_own_container\". Déjame consultar nuevamente.",
+      "violations": [
+        {
+          "metric": "memory_accuracy",
+          "reason": "estado purchaseType = null (esperado refill_with_own_container)"
+        }
+      ]
+    },
+    {
+      "scenarioId": "E010",
+      "category": "quotation",
+      "input": "Quiero 50 bidones, necesito los bidones nuevos",
+      "output": "De acuerdo. Bidón nuevo de 20 L Agua ReNew: El precio aplicable es S/ 20.00 por bidón. El total para 50 bidones es S/ 1,000.00.\n\n¿Desea revisar otra cantidad?",
+      "violations": [
+        {
+          "metric": "memory_accuracy",
+          "reason": "estado purchaseType = null (esperado new_bidon_first_refill)"
+        }
+      ]
+    },
+    {
+      "scenarioId": "G001",
+      "category": "memory",
+      "input": "Ya tengo logo",
+      "output": "¡Perfecto! Entonces ya tiene un avance importante. \n\nPara recomendarle la opción que mejor se ajuste a su negocio, ¿me comenta qué es lo que busca?",
+      "violations": [
+        {
+          "metric": "memory_accuracy",
+          "reason": "estado hasLogo = null (esperado true)"
+        }
+      ]
+    },
+    {
+      "scenarioId": "G002",
+      "category": "memory",
+      "input": "No tengo logo",
+      "output": "No hay problema, es algo que resolvemos juntos. Para la maquila con su propia marca, el logo es clave, y justamente ofrecemos un servicio de diseño de logotipo profesional para que su producto salga con una imagen sólida desde el inicio.\n\n¿Le parece si primero le cuento cómo trabajamos ese diseño, o prefiere revisar las presentaciones que podemos maquilarle?",
+      "violations": [
+        {
+          "metric": "memory_accuracy",
+          "reason": "estado hasLogo = null (esperado false); estado needsDesign = null (esperado true)"
+        }
+      ]
+    },
+    {
+      "scenarioId": "G003",
+      "category": "memory",
+      "input": "Quiero 625 ml con mi marca | Ya te dije que tengo logo",
+      "output": "Perfecto, la botella PET de 625 ml con tapa rosca y su propia marca es una excelente opción: es práctica, ligera y muy comercial para consumo individual.\n\nPara poder cotizarle correctamente, ¿me indica qué cantidad estaría necesitando? Así le preparo los precios y condiciones exactas. ⏎ Entendido, ya tengo anotado que cuenta con logo. \n\nPara armarle la cotización de la botella de 625 ml con su mar",
+      "violations": [
+        {
+          "metric": "memory_accuracy",
+          "reason": "estado hasLogo = null (esperado true)"
+        }
+      ]
+    },
+    {
+      "scenarioId": "G005",
+      "category": "memory",
+      "input": "Tengo logo | No tengo logo",
+      "output": "¡Perfecto que ya tenga su logo! Eso nos permite avanzar directo a la parte práctica.\n\nP\n\n¿Hay algo más que le gustaría revisar? ⏎ Perfecto, no hay problema. Si más adelante decide trabajar su propia marca, podemos ayudarlo también con el diseño del logo.\n\nPara orientarlo mejor: ¿qué es lo que busca?",
+      "violations": [
+        {
+          "metric": "memory_accuracy",
+          "reason": "estado hasLogo = true (esperado false)"
+        }
+      ]
+    },
+    {
+      "scenarioId": "G006",
+      "category": "memory",
+      "input": "Tengo una bodega y quiero vender agua | ¿Cuánto cuesta la de 625?",
+      "output": "¡Qué buena idea! Vender agua en una bodega es un excelente complemento, porque es un producto de alta rotación que sus clientes buscan a diario.\n\nTenemos tres rutas para empezar, y según su caso le conviene una en especial:\n\nMaquila: agua con su propia marca, ideal para diferenciarse.\nDistribución Agua ReNew: revender nuestra marca, listo para comercializar.\nCompra directa: para consumo propio o v",
+      "violations": [
+        {
+          "metric": "memory_accuracy",
+          "reason": "estado businessType = null (esperado bodega); estado productId = null (esperado maquila_botella_625ml_rosca)"
+        }
+      ]
+    },
+    {
+      "scenarioId": "K002",
+      "category": "brand_logo",
+      "input": "No tengo logo",
+      "output": "Entiendo perfectamente, y no se preocupe: es más común de lo que cree. Para la maquila con su propia marca, el logo es clave para dar identidad al producto, pero tenemos opciones para cubrir esa parte si aún no cuenta con uno.\n\n¿Ya tiene definido el nombre de su marca o está empezando desde cero? Con eso le oriento mejor sobre cómo podemos acompañarlo en el proceso.",
+      "violations": [
+        {
+          "metric": "memory_accuracy",
+          "reason": "estado hasLogo = null (esperado false)"
+        }
+      ]
+    },
+    {
+      "scenarioId": "K005",
+      "category": "brand_logo",
+      "input": "Eso del logo ya lo tengo diseñado",
+      "output": "Perfecto, eso agiliza bastante el proceso. Con su logo listo, podemos pasar directo a definir la presentación.\n\n¿Qué formato le interesa trabajar?",
+      "violations": [
+        {
+          "metric": "memory_accuracy",
+          "reason": "estado hasLogo = null (esperado true)"
+        }
+      ]
+    },
+    {
+      "scenarioId": "N001",
+      "category": "multi_turn",
+      "input": "Quiero mi propia marca | 625 ml | 20 paquetes | Ya tengo logo | 300 son muchas | ¿Se pueden guardar? | Perfecto, entonces sí me sirve",
+      "output": "¡Qué buena idea lanzar su propia marca! Con la maquila de Agua ReNew usted produce agua con su nombre y etiqueta, sin invertir en planta ni equipos. Nosotros nos encargamos de todo el proceso y usted se enfoca en comercializar.\n\n¿Ya tiene pensada la presentación que le gustaría trabajar? Por ejemplo, bidón de 20 L, botellas de 1 L o galoneras de 10.5 L. Con eso le comento las opciones y cantidades",
+      "violations": [
+        {
+          "metric": "memory_accuracy",
+          "reason": "estado hasLogo = null (esperado true)"
+        }
+      ]
+    },
+    {
+      "scenarioId": "N002",
+      "category": "multi_turn",
+      "input": "Soy taxista y quiero regalar agua a mis pasajeros | 300 son muchas | ¿Se pueden guardar? | Perfecto",
+      "output": "¡Qué buena iniciativa! Regalar agua a sus pasajeros es un detalle que marca la diferencia y deja una imagen muy profesional.\n\nTenemos dos caminos que pueden encajarle: poner su propia marca en el agua (maquila) o llevar botellas ya listas de Agua ReNew. Ambas opciones funcionan muy bien para este tipo de negocio.\n\n¿Cuál le llama más la atención? Así le doy más detalle de la que mejor se ajuste a l",
+      "violations": [
+        {
+          "metric": "memory_accuracy",
+          "reason": "estado useCase = null (esperado regalar agua a sus pasajeros); estado businessType = null (esperado taxi)"
+        }
+      ]
+    },
+    {
+      "scenarioId": "N003",
+      "category": "multi_turn",
+      "input": "Tengo un restaurante | ¿Cuánto cuesta la de 625? | 20 paquetes",
+      "output": "¡Perfecto! Para un restaurante, el agua con su propia marca es una excelente forma de reforzar la identidad del local y ofrecer una experiencia más cuidada a sus comensales.\n\n¿Le interesaría trabajar con su propia marca de agua (maquila) o prefiere distribuir la marca Agua ReNew? Con eso le comento las opciones más adecuadas para su caso. ⏎ Claro, para la botella PET de 625 ml necesito confirmarle",
+      "violations": [
+        {
+          "metric": "memory_accuracy",
+          "reason": "estado businessType = null (esperado restaurante); estado productId = null (esperado maquila_botella_625ml_rosca); estado quantity = null (esperado 20)"
+        }
+      ]
+    },
+    {
+      "scenarioId": "N004",
+      "category": "multi_turn",
+      "input": "Tengo un gimnasio | Quiero 1 litro con mi marca | No, mejor 625 ml",
+      "output": "¡Perfecto! Un gimnasio es un excelente punto para ofrecer agua, tanto para tus clientes como para generar un ingreso extra.\n\nTenemos tres caminos según tu objetivo:\nMaquila: agua con tu propia marca del gimnasio.\nDistribución: comercializar la marca Agua ReNew.\nCompra directa: para consumo de tus clientes.\n\n¿Cuál de estas opciones te gustaría explorar? ⏎ Perfecto, la botella de 1 litro con tu marc",
+      "violations": [
+        {
+          "metric": "memory_accuracy",
+          "reason": "estado businessType = null (esperado gimnasio); estado productId = null (esperado maquila_botella_625ml_rosca)"
+        }
+      ]
+    }
+  ]
+}

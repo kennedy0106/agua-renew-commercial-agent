@@ -11,7 +11,10 @@
     "test:postgres": "set RUN_POSTGRES_TESTS=1&& node --test",
     "test:deepseek": "set RUN_DEEPSEEK_TESTS=1&& node --test test/deepseek.integration.test.mjs",
     "start:simulator": "node apps/simulator/server.mjs",
-    "migrate": "node scripts/migrate.mjs"
+    "migrate": "node scripts/migrate.mjs",
+    "eval": "node eval/cli.mjs --run",
+    "eval:dry": "node eval/cli.mjs --dry",
+    "eval:compare": "node eval/cli.mjs --compare"
   },
   "dependencies": {
     "pg": "^8.13.1"

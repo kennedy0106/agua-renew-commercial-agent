@@ -42,3 +42,7 @@ backup*.sql
 # ── Documentos estratégicos / comerciales locales (no runtime) ─
 PROJECT_PLAN_WHATSAPP_AUTOMATION.md
 knowledge/agua_renew_commercial_kb.md
+
+# ── Evaluación (Bloque D): transcripciones crudas por corrida (los reportes
+#    latest.json/latest.md SÍ se versionan) ─
+eval/results/

@@ -1,0 +1,27 @@
+{
+  "eval_dataset_version": 1,
+  "defaultModel": "deepseek_flash_v4",
+  "models": {
+    "deepseek_flash_v4": {
+      "provider": "deepseek",
+      "modelId": "env",
+      "label": "DeepSeek Flash V4",
+      "available": true,
+      "pricing": { "inputPer1M": 0.27, "outputPer1M": 1.10, "note": "Referencial — ajustar a tarifas vigentes (config externa, no código)" }
+    },
+    "gpt_5_6_luna": {
+      "provider": "openai",
+      "modelId": "gpt-5.6-luna",
+      "label": "GPT-5.6 Luna",
+      "available": false,
+      "pricing": { "inputPer1M": 0.50, "outputPer1M": 1.50, "note": "Referencial — ajustar a tarifas vigentes (config externa, no código)" }
+    },
+    "gpt_5_6_terra": {
+      "provider": "openai",
+      "modelId": "gpt-5.6-terra",
+      "label": "GPT-5.6 Terra",
+      "available": false,
+      "pricing": { "inputPer1M": 2.50, "outputPer1M": 10.00, "note": "Referencial premium — ajustar a tarifas vigentes (config externa, no código)" }
+    }
+  }
+}

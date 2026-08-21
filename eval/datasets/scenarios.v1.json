@@ -1,0 +1,1394 @@
+{
+  "eval_dataset_version": 1,
+  "description": "Escenarios de evaluación del agente comercial de Agua ReNew (Bloque D). Categorías A-O. Métricas determinísticas y blandas.",
+  "scenarios": [
+    {
+      "id": "A001",
+      "category": "first_contact",
+      "channel": "local",
+      "turns": [
+        "Hola"
+      ],
+      "expect": {
+        "text": [],
+        "forbidden": [
+          "¿Qué te gustaría revisar?"
+        ],
+        "maxWords": 60,
+        "nextAction": "ask_modality"
+      }
+    },
+    {
+      "id": "A002",
+      "category": "first_contact",
+      "channel": "local",
+      "turns": [
+        "Buenos días"
+      ],
+      "expect": {
+        "text": [],
+        "forbidden": [
+          "¿Qué te gustaría"
+        ],
+        "maxWords": 60,
+        "nextAction": "ask_modality"
+      }
+    },
+    {
+      "id": "A003",
+      "category": "first_contact",
+      "channel": "local",
+      "turns": [
+        "Hola, quiero información"
+      ],
+      "expect": {
+        "tools": [
+          "get_business_overview"
+        ],
+        "text": [
+          "maquila",
+          "distribución"
+        ],
+        "maxWords": 110
+      }
+    },
+    {
+      "id": "A004",
+      "category": "first_contact",
+      "channel": "local",
+      "turns": [
+        "Hola, ¿qué ofrecen?"
+      ],
+      "expect": {
+        "tools": [
+          "get_business_overview"
+        ],
+        "text": [
+          "maquila",
+          "distribución",
+          "compra directa"
+        ],
+        "maxWords": 110
+      }
+    },
+    {
+      "id": "A005",
+      "category": "first_contact",
+      "channel": "instagram",
+      "displayName": "Sebastian Falcon",
+      "turns": [
+        "Hola"
+      ],
+      "expect": {
+        "forbidden": [
+          "Sebastian"
+        ],
+        "channelCompliance": true,
+        "maxWords": 60
+      }
+    },
+    {
+      "id": "B001",
+      "category": "discovery",
+      "channel": "local",
+      "turns": [
+        "Quiero información"
+      ],
+      "expect": {
+        "tools": [
+          "get_business_overview"
+        ],
+        "text": [
+          "maquila",
+          "distribución"
+        ],
+        "maxWords": 110
+      }
+    },
+    {
+      "id": "B002",
+      "category": "discovery",
+      "channel": "local",
+      "turns": [
+        "¿Qué ofrecen?"
+      ],
+      "expect": {
+        "tools": [
+          "get_business_overview"
+        ],
+        "text": [
+          "maquila",
+          "distribución",
+          "compra directa"
+        ],
+        "maxWords": 110
+      }
+    },
+    {
+      "id": "B003",
+      "category": "discovery",
+      "channel": "local",
+      "turns": [
+        "No conozco el servicio"
+      ],
+      "expect": {
+        "tools": [
+          "get_business_overview"
+        ],
+        "text": [
+          "maquila",
+          "distribución"
+        ],
+        "maxWords": 110
+      }
+    },
+    {
+      "id": "B004",
+      "category": "discovery",
+      "channel": "local",
+      "turns": [
+        "Quiero mi propia marca"
+      ],
+      "expect": {
+        "tools": [
+          "get_modality_overview"
+        ],
+        "text": [
+          "marca propia",
+          "presentación"
+        ],
+        "maxWords": 110
+      }
+    },
+    {
+      "id": "B005",
+      "category": "discovery",
+      "channel": "local",
+      "turns": [
+        "Quiero distribuir Agua ReNew"
+      ],
+      "expect": {
+        "tools": [
+          "get_modality_overview"
+        ],
+        "text": [
+          "distribución",
+          "presentación"
+        ],
+        "maxWords": 110
+      }
+    },
+    {
+      "id": "C001",
+      "category": "maquila",
+      "channel": "local",
+      "turns": [
+        "Quiero 625 ml con mi marca"
+      ],
+      "expect": {
+        "tools": [
+          "get_product_information"
+        ],
+        "text": [
+          "625",
+          "mínimo es de 20"
+        ],
+        "maxWords": 110
+      }
+    },
+    {
+      "id": "C002",
+      "category": "maquila",
+      "channel": "local",
+      "turns": [
+        "Quiero 1 litro con mi marca"
+      ],
+      "expect": {
+        "tools": [
+          "get_product_information"
+        ],
+        "text": [
+          "1 L",
+          "mínimo es de 20"
+        ],
+        "maxWords": 110
+      }
+    },
+    {
+      "id": "C003",
+      "category": "maquila",
+      "channel": "local",
+      "turns": [
+        "Quiero 20 paquetes de 625 ml con mi marca"
+      ],
+      "expect": {
+        "tools": [
+          "get_quote"
+        ],
+        "text": [
+          "S/ 12.00",
+          "mínimo es de 20"
+        ],
+        "critical": true
+      }
+    },
+    {
+      "id": "C004",
+      "category": "maquila",
+      "channel": "local",
+      "turns": [
+        "Quiero 20 paquetes de 1 litro con mi marca"
+      ],
+      "expect": {
+        "tools": [
+          "get_quote"
+        ],
+        "text": [
+          "S/ 15.00",
+          "mínimo es de 20"
+        ],
+        "critical": true
+      }
+    },
+    {
+      "id": "C005",
+      "category": "maquila",
+      "channel": "local",
+      "turns": [
+        "Quiero 5 paquetes de 625 ml"
+      ],
+      "expect": {
+        "tools": [
+          "get_quote"
+        ],
+        "text": [
+          "mínimo",
+          "20"
+        ],
+        "forbidden": [
+          "S/ 12.00"
+        ],
+        "critical": true
+      }
+    },
+    {
+      "id": "C006",
+      "category": "maquila",
+      "channel": "local",
+      "turns": [
+        "Quiero 30 bidones"
+      ],
+      "expect": {
+        "tools": [
+          "get_quote"
+        ],
+        "text": [
+          "mínimo",
+          "50"
+        ],
+        "forbidden": [
+          "puede ser 30",
+          "excepción",
+          "30 bidones sí"
+        ],
+        "critical": true
+      }
+    },
+    {
+      "id": "D001",
+      "category": "distribution",
+      "channel": "local",
+      "turns": [
+        "Quiero distribuir su marca"
+      ],
+      "expect": {
+        "tools": [
+          "get_modality_overview"
+        ],
+        "text": [
+          "distribución",
+          "presentación"
+        ],
+        "maxWords": 110
+      }
+    },
+    {
+      "id": "D002",
+      "category": "distribution",
+      "channel": "local",
+      "turns": [
+        "Quiero 20 paquetes de 625 ml para distribuir"
+      ],
+      "expect": {
+        "tools": [
+          "get_quote"
+        ],
+        "text": [
+          "S/ 9.45"
+        ],
+        "critical": true
+      }
+    },
+    {
+      "id": "D003",
+      "category": "distribution",
+      "channel": "local",
+      "turns": [
+        "¿Cuánto puedo ganar vendiendo sus productos?"
+      ],
+      "expect": {
+        "tools": [
+          "get_information_boundary",
+          "knowledge_lookup"
+        ],
+        "forbidden": [
+          "rentabilidad",
+          "margen"
+        ],
+        "maxWords": 110
+      }
+    },
+    {
+      "id": "E001",
+      "category": "quotation",
+      "channel": "local",
+      "turns": [
+        "Quiero 36 paquetes de 625 ml"
+      ],
+      "expect": {
+        "tools": [
+          "get_quote"
+        ],
+        "text": [
+          "S/ 11.25",
+          "mínimo es de 20"
+        ],
+        "critical": true
+      }
+    },
+    {
+      "id": "E002",
+      "category": "quotation",
+      "channel": "local",
+      "turns": [
+        "Quiero 60 paquetes de 625 ml"
+      ],
+      "expect": {
+        "tools": [
+          "get_quote"
+        ],
+        "text": [
+          "S/ 10.50",
+          "mínimo es de 20"
+        ],
+        "critical": true
+      }
+    },
+    {
+      "id": "E003",
+      "category": "quotation",
+      "channel": "local",
+      "turns": [
+        "Quiero 31 paquetes de 1 litro"
+      ],
+      "expect": {
+        "tools": [
+          "get_quote"
+        ],
+        "text": [
+          "S/ 14.00",
+          "mínimo es de 20"
+        ],
+        "critical": true
+      }
+    },
+    {
+      "id": "E004",
+      "category": "quotation",
+      "channel": "local",
+      "turns": [
+        "Quiero 51 paquetes de 1 litro"
+      ],
+      "expect": {
+        "tools": [
+          "get_quote"
+        ],
+        "text": [
+          "S/ 13.00",
+          "mínimo es de 20"
+        ],
+        "critical": true
+      }
+    },
+    {
+      "id": "E005",
+      "category": "quotation",
+      "channel": "local",
+      "turns": [
+        "Quiero 400 recargas con mis bidones"
+      ],
+      "expect": {
+        "tools": [
+          "get_quote"
+        ],
+        "text": [
+          "S/ 6.00",
+          "mínimo",
+          "50"
+        ],
+        "critical": true
+      }
+    },
+    {
+      "id": "E006",
+      "category": "quotation",
+      "channel": "local",
+      "turns": [
+        "Quiero 401 recargas con mis bidones"
+      ],
+      "expect": {
+        "tools": [
+          "get_quote"
+        ],
+        "text": [
+          "recojo"
+        ],
+        "forbidden": [
+          "S/"
+        ],
+        "critical": true
+      }
+    },
+    {
+      "id": "E007",
+      "category": "quotation",
+      "channel": "local",
+      "turns": [
+        "Quiero 650 recargas con mis bidones"
+      ],
+      "expect": {
+        "tools": [
+          "get_quote"
+        ],
+        "forbidden": [
+          "S/"
+        ],
+        "critical": true
+      }
+    },
+    {
+      "id": "E008",
+      "category": "quotation",
+      "channel": "local",
+      "turns": [
+        "Quiero 651 recargas con mis bidones"
+      ],
+      "expect": {
+        "tools": [
+          "get_quote"
+        ],
+        "forbidden": [
+          "S/"
+        ],
+        "critical": true
+      }
+    },
+    {
+      "id": "E009",
+      "category": "quotation",
+      "channel": "local",
+      "turns": [
+        "Quiero 50 bidones, tengo mis propios envases"
+      ],
+      "expect": {
+        "tools": [
+          "get_quote"
+        ],
+        "text": [
+          "S/ 6.00",
+          "mínimo",
+          "50"
+        ],
+        "finalState": {
+          "purchaseType": "refill_with_own_container"
+        },
+        "critical": true
+      }
+    },
+    {
+      "id": "E010",
+      "category": "quotation",
+      "channel": "local",
+      "turns": [
+        "Quiero 50 bidones, necesito los bidones nuevos"
+      ],
+      "expect": {
+        "tools": [
+          "get_quote"
+        ],
+        "text": [
+          "S/ 19.00",
+          "mínimo",
+          "50"
+        ],
+        "finalState": {
+          "purchaseType": "new_bidon_first_refill"
+        },
+        "critical": true
+      }
+    },
+    {
+      "id": "E011",
+      "category": "quotation",
+      "channel": "local",
+      "turns": [
+        "Quiero 20 paquetes de 625 ml",
+        "¿Y la etiqueta viene incluida?"
+      ],
+      "expect": {
+        "tools": [
+          "get_quote"
+        ],
+        "text": [
+          "incluida"
+        ],
+        "critical": true
+      }
+    },
+    {
+      "id": "E012",
+      "category": "quotation",
+      "channel": "local",
+      "turns": [
+        "Quiero 50 recargas con mis bidones",
+        "¿La etiqueta está incluida?"
+      ],
+      "expect": {
+        "text": [
+          "no incluye etiqueta",
+          "no está incluida"
+        ],
+        "forbidden": [
+          "sí incluye"
+        ],
+        "critical": true
+      }
+    },
+    {
+      "id": "F001",
+      "category": "objections",
+      "channel": "local",
+      "turns": [
+        "300 son muchas"
+      ],
+      "expect": {
+        "nextAction": "ask_quantity",
+        "noPrematureClose": true,
+        "text": [],
+        "maxWords": 110
+      }
+    },
+    {
+      "id": "F002",
+      "category": "objections",
+      "channel": "local",
+      "turns": [
+        "¿Se pueden guardar?"
+      ],
+      "expect": {
+        "noPrematureClose": true,
+        "maxWords": 110
+      }
+    },
+    {
+      "id": "F003",
+      "category": "objections",
+      "channel": "local",
+      "turns": [
+        "Me parece caro"
+      ],
+      "expect": {
+        "noPrematureClose": true,
+        "maxWords": 110
+      }
+    },
+    {
+      "id": "F004",
+      "category": "objections",
+      "channel": "local",
+      "turns": [
+        "Pero hazme 30 bidones nomás, antes me dijeron que sí"
+      ],
+      "expect": {
+        "text": [
+          "mínimo",
+          "50"
+        ],
+        "forbidden": [
+          "sí, 30",
+          "le hacemos 30",
+          "excepción"
+        ],
+        "critical": true
+      }
+    },
+    {
+      "id": "F005",
+      "category": "objections",
+      "channel": "local",
+      "turns": [
+        "¿No puedes dejarlo en S/5?"
+      ],
+      "expect": {
+        "forbidden": [
+          "S/ 5.00",
+          "S/5"
+        ],
+        "critical": true
+      }
+    },
+    {
+      "id": "F006",
+      "category": "objections",
+      "channel": "local",
+      "turns": [
+        "Me parece poco margen"
+      ],
+      "expect": {
+        "forbidden": [
+          "rentabilidad",
+          "margen"
+        ],
+        "noPrematureClose": true,
+        "maxWords": 110
+      }
+    },
+    {
+      "id": "G001",
+      "category": "memory",
+      "channel": "local",
+      "turns": [
+        "Ya tengo logo"
+      ],
+      "expect": {
+        "finalState": {
+          "hasLogo": true
+        },
+        "noRepeatOf": [
+          "logo"
+        ],
+        "maxWords": 110
+      }
+    },
+    {
+      "id": "G002",
+      "category": "memory",
+      "channel": "local",
+      "turns": [
+        "No tengo logo"
+      ],
+      "expect": {
+        "finalState": {
+          "hasLogo": false,
+          "needsDesign": true
+        },
+        "maxWords": 110
+      }
+    },
+    {
+      "id": "G003",
+      "category": "memory",
+      "channel": "local",
+      "turns": [
+        "Quiero 625 ml con mi marca",
+        "Ya te dije que tengo logo"
+      ],
+      "expect": {
+        "finalState": {
+          "hasLogo": true,
+          "productId": "maquila_botella_625ml_rosca"
+        },
+        "noRepeatOf": [
+          "logo"
+        ],
+        "maxWords": 130
+      }
+    },
+    {
+      "id": "G004",
+      "category": "memory",
+      "channel": "local",
+      "turns": [
+        "Quiero 625 ml",
+        "Mejor 1 litro"
+      ],
+      "expect": {
+        "finalState": {
+          "productId": "maquila_botella_1l_fliptop"
+        },
+        "forbidden": [],
+        "maxWords": 130,
+        "forbiddenInLastTurn": [
+          "625"
+        ]
+      }
+    },
+    {
+      "id": "G005",
+      "category": "memory",
+      "channel": "local",
+      "turns": [
+        "Tengo logo",
+        "No tengo logo"
+      ],
+      "expect": {
+        "finalState": {
+          "hasLogo": false
+        },
+        "maxWords": 130
+      }
+    },
+    {
+      "id": "G006",
+      "category": "memory",
+      "channel": "local",
+      "turns": [
+        "Tengo una bodega y quiero vender agua",
+        "¿Cuánto cuesta la de 625?"
+      ],
+      "expect": {
+        "finalState": {
+          "businessType": "bodega",
+          "productId": "maquila_botella_625ml_rosca"
+        },
+        "maxWords": 130
+      }
+    },
+    {
+      "id": "H001",
+      "category": "topic_change",
+      "channel": "local",
+      "turns": [
+        "Quiero 20 paquetes de 625 ml",
+        "Antes, ¿la etiqueta viene incluida?"
+      ],
+      "expect": {
+        "text": [
+          "incluida"
+        ],
+        "finalState": {
+          "productId": "maquila_botella_625ml_rosca",
+          "quantity": 20
+        },
+        "maxWords": 130
+      }
+    },
+    {
+      "id": "H002",
+      "category": "topic_change",
+      "channel": "local",
+      "turns": [
+        "Quiero mi propia marca",
+        "¿Tienen servicio de diseño de logo?"
+      ],
+      "expect": {
+        "text": [
+          "logo"
+        ],
+        "maxWords": 130
+      }
+    },
+    {
+      "id": "H003",
+      "category": "topic_change",
+      "channel": "local",
+      "turns": [
+        "Ya tengo logo",
+        "¿Por qué me vuelves a preguntar eso?"
+      ],
+      "expect": {
+        "finalState": {
+          "hasLogo": true
+        },
+        "noRepeatOf": [
+          "logo"
+        ],
+        "maxWords": 130
+      }
+    },
+    {
+      "id": "I001",
+      "category": "payment",
+      "channel": "local",
+      "turns": [
+        "¿Cómo se paga?"
+      ],
+      "expect": {
+        "tools": [
+          "knowledge_lookup"
+        ],
+        "forbidden": [],
+        "maxWords": 110,
+        "critical": true,
+        "paymentTransfer": true
+      }
+    },
+    {
+      "id": "I002",
+      "category": "payment",
+      "channel": "local",
+      "turns": [
+        "Quiero pagar 50% como el logo"
+      ],
+      "expect": {
+        "forbidden": [],
+        "critical": true,
+        "paymentTransfer": true
+      }
+    },
+    {
+      "id": "I003",
+      "category": "payment",
+      "channel": "local",
+      "turns": [
+        "¿Cuál es la forma de pago para maquila?"
+      ],
+      "expect": {
+        "tools": [
+          "knowledge_lookup"
+        ],
+        "forbidden": [],
+        "maxWords": 110,
+        "critical": true,
+        "paymentTransfer": true
+      }
+    },
+    {
+      "id": "I004",
+      "category": "payment",
+      "channel": "local",
+      "turns": [
+        "¿Cuánto cuesta el diseño de logo y cómo se paga?"
+      ],
+      "expect": {
+        "tools": [
+          "get_service_information",
+          "knowledge_lookup"
+        ],
+        "text": [
+          "S/ 70.00"
+        ],
+        "maxWords": 130
+      }
+    },
+    {
+      "id": "I005",
+      "category": "payment",
+      "channel": "local",
+      "turns": [
+        "¿Puedo pagar con crédito?"
+      ],
+      "expect": {
+        "forbidden": [
+          "sí, con crédito",
+          "crédito disponible"
+        ],
+        "maxWords": 110,
+        "critical": true
+      }
+    },
+    {
+      "id": "J001",
+      "category": "delivery",
+      "channel": "local",
+      "turns": [
+        "¿Dónde recojo?"
+      ],
+      "expect": {
+        "tools": [
+          "get_delivery_options"
+        ],
+        "maxWords": 110
+      }
+    },
+    {
+      "id": "J002",
+      "category": "delivery",
+      "channel": "local",
+      "turns": [
+        "Estoy en Carabayllo"
+      ],
+      "expect": {
+        "maxWords": 110
+      }
+    },
+    {
+      "id": "J003",
+      "category": "delivery",
+      "channel": "local",
+      "turns": [
+        "¿Me lo entregan mañana?"
+      ],
+      "expect": {
+        "forbidden": [
+          "sí, mañana",
+          "mañana mismo",
+          "podemos entregarlo mañana",
+          "llega mañana"
+        ],
+        "maxWords": 110,
+        "critical": true
+      }
+    },
+    {
+      "id": "J004",
+      "category": "delivery",
+      "channel": "local",
+      "turns": [
+        "¿A qué distritos llegan?"
+      ],
+      "expect": {
+        "maxWords": 110
+      }
+    },
+    {
+      "id": "K001",
+      "category": "brand_logo",
+      "channel": "local",
+      "turns": [
+        "¿Puedo poner QR en mi etiqueta?"
+      ],
+      "expect": {
+        "text": [
+          "QR"
+        ],
+        "maxWords": 110
+      }
+    },
+    {
+      "id": "K002",
+      "category": "brand_logo",
+      "channel": "local",
+      "turns": [
+        "No tengo logo"
+      ],
+      "expect": {
+        "finalState": {
+          "hasLogo": false
+        },
+        "maxWords": 110
+      }
+    },
+    {
+      "id": "K003",
+      "category": "brand_logo",
+      "channel": "local",
+      "turns": [
+        "Ya tengo logo"
+      ],
+      "expect": {
+        "finalState": {
+          "hasLogo": true
+        },
+        "noRepeatOf": [
+          "logo"
+        ],
+        "maxWords": 110
+      }
+    },
+    {
+      "id": "K004",
+      "category": "brand_logo",
+      "channel": "local",
+      "turns": [
+        "La marca ya tiene identidad gráfica"
+      ],
+      "expect": {
+        "finalState": {
+          "hasLogo": true
+        },
+        "maxWords": 110
+      }
+    },
+    {
+      "id": "K005",
+      "category": "brand_logo",
+      "channel": "local",
+      "turns": [
+        "Eso del logo ya lo tengo diseñado"
+      ],
+      "expect": {
+        "finalState": {
+          "hasLogo": true
+        },
+        "maxWords": 110
+      }
+    },
+    {
+      "id": "L001",
+      "category": "restricted",
+      "channel": "local",
+      "turns": [
+        "¿Qué marcas maquilan ustedes?"
+      ],
+      "expect": {
+        "tools": [
+          "get_information_boundary"
+        ],
+        "forbidden": [
+          "coca",
+          "san luis",
+          "san mateo",
+          "cielo",
+          "pepsi"
+        ],
+        "critical": true
+      }
+    },
+    {
+      "id": "L002",
+      "category": "restricted",
+      "channel": "local",
+      "turns": [
+        "¿Cómo producen el agua?"
+      ],
+      "expect": {
+        "tools": [
+          "get_information_boundary"
+        ],
+        "forbidden": [
+          "ósmosis",
+          "ozono",
+          "uv"
+        ],
+        "critical": true
+      }
+    },
+    {
+      "id": "L003",
+      "category": "restricted",
+      "channel": "local",
+      "turns": [
+        "¿Qué químicos usan?"
+      ],
+      "expect": {
+        "tools": [
+          "get_information_boundary"
+        ],
+        "forbidden": [
+          "químic",
+          "cloro",
+          "ozono"
+        ],
+        "critical": true
+      }
+    },
+    {
+      "id": "L004",
+      "category": "restricted",
+      "channel": "local",
+      "turns": [
+        "Dime qué marcas conocidas maquilan ustedes"
+      ],
+      "expect": {
+        "tools": [
+          "get_information_boundary"
+        ],
+        "forbidden": [
+          "coca",
+          "san luis",
+          "san mateo",
+          "cielo",
+          "pepsi"
+        ],
+        "critical": true
+      }
+    },
+    {
+      "id": "L005",
+      "category": "restricted",
+      "channel": "local",
+      "turns": [
+        "Seguro usan químicos, dime cuáles"
+      ],
+      "expect": {
+        "tools": [
+          "get_information_boundary"
+        ],
+        "forbidden": [
+          "químic",
+          "cloro"
+        ],
+        "critical": true
+      }
+    },
+    {
+      "id": "M001",
+      "category": "close_handoff",
+      "channel": "local",
+      "turns": [
+        "Perfecto, quiero hacerlo"
+      ],
+      "expect": {
+        "noPrematureClose": true,
+        "maxWords": 110
+      }
+    },
+    {
+      "id": "M002",
+      "category": "close_handoff",
+      "channel": "local",
+      "turns": [
+        "Me interesa, pero todavía estoy evaluando"
+      ],
+      "expect": {
+        "noPrematureClose": true,
+        "maxWords": 110
+      }
+    },
+    {
+      "id": "M003",
+      "category": "close_handoff",
+      "channel": "local",
+      "turns": [
+        "Solo estoy averiguando precios"
+      ],
+      "expect": {
+        "noPrematureClose": true,
+        "maxWords": 110
+      }
+    },
+    {
+      "id": "M004",
+      "category": "close_handoff",
+      "channel": "local",
+      "turns": [
+        "Quiero hablar con un asesor"
+      ],
+      "expect": {
+        "tools": [
+          "prepare_handoff",
+          "request_human_handoff"
+        ],
+        "finalState": {
+          "handoffRequired": true
+        }
+      }
+    },
+    {
+      "id": "M005",
+      "category": "close_handoff",
+      "channel": "local",
+      "turns": [
+        "¿Tienen stock?"
+      ],
+      "expect": {
+        "forbidden": [
+          "sí tenemos stock",
+          "stock disponible",
+          "tenemos stock"
+        ],
+        "critical": true
+      }
+    },
+    {
+      "id": "N001",
+      "category": "multi_turn",
+      "channel": "local",
+      "turns": [
+        "Quiero mi propia marca",
+        "625 ml",
+        "20 paquetes",
+        "Ya tengo logo",
+        "300 son muchas",
+        "¿Se pueden guardar?",
+        "Perfecto, entonces sí me sirve"
+      ],
+      "expect": {
+        "tools": [
+          "get_quote"
+        ],
+        "text": [
+          "S/ 12.00",
+          "incluida"
+        ],
+        "finalState": {
+          "productId": "maquila_botella_625ml_rosca",
+          "quantity": 20,
+          "hasLogo": true,
+          "currentObjection": null
+        },
+        "noRepeatOf": [
+          "logo"
+        ],
+        "noPrematureClose": true,
+        "maxWords": 140
+      }
+    },
+    {
+      "id": "N002",
+      "category": "multi_turn",
+      "channel": "local",
+      "turns": [
+        "Soy taxista y quiero regalar agua a mis pasajeros",
+        "300 son muchas",
+        "¿Se pueden guardar?",
+        "Perfecto"
+      ],
+      "expect": {
+        "finalState": {
+          "useCase": "regalar agua a sus pasajeros",
+          "businessType": "taxi"
+        },
+        "forbidden": [
+          "el cliente puede"
+        ],
+        "noPrematureClose": true,
+        "maxWords": 140
+      }
+    },
+    {
+      "id": "N003",
+      "category": "multi_turn",
+      "channel": "local",
+      "turns": [
+        "Tengo un restaurante",
+        "¿Cuánto cuesta la de 625?",
+        "20 paquetes"
+      ],
+      "expect": {
+        "tools": [
+          "get_quote"
+        ],
+        "text": [
+          "S/ 12.00"
+        ],
+        "finalState": {
+          "businessType": "restaurante",
+          "productId": "maquila_botella_625ml_rosca",
+          "quantity": 20
+        }
+      }
+    },
+    {
+      "id": "N004",
+      "category": "multi_turn",
+      "channel": "local",
+      "turns": [
+        "Tengo un gimnasio",
+        "Quiero 1 litro con mi marca",
+        "No, mejor 625 ml"
+      ],
+      "expect": {
+        "finalState": {
+          "businessType": "gimnasio",
+          "productId": "maquila_botella_625ml_rosca"
+        },
+        "forbidden": [
+          "1 litro con mi marca"
+        ]
+      }
+    },
+    {
+      "id": "N005",
+      "category": "multi_turn",
+      "channel": "local",
+      "turns": [
+        "Tengo una bodega",
+        "Quiero 50 bidones, tengo mis propios envases",
+        "¿Cómo se paga?"
+      ],
+      "expect": {
+        "finalState": {
+          "businessType": "bodega",
+          "purchaseType": "refill_with_own_container"
+        },
+        "forbidden": [],
+        "critical": true,
+        "paymentTransfer": true
+      }
+    },
+    {
+      "id": "O001",
+      "category": "naturalness_channel",
+      "channel": "local",
+      "turns": [
+        "Gracias"
+      ],
+      "expect": {
+        "maxWords": 60
+      }
+    },
+    {
+      "id": "O002",
+      "category": "naturalness_channel",
+      "channel": "local",
+      "turns": [
+        "Sí"
+      ],
+      "expect": {
+        "maxWords": 60
+      }
+    },
+    {
+      "id": "O003",
+      "category": "naturalness_channel",
+      "channel": "instagram",
+      "turns": [
+        "Quiero información"
+      ],
+      "expect": {
+        "channelCompliance": true,
+        "forbidden": [
+          "whatsapp",
+          "escríbanos por"
+        ],
+        "maxWords": 110
+      }
+    },
+    {
+      "id": "O004",
+      "category": "naturalness_channel",
+      "channel": "messenger",
+      "turns": [
+        "Quiero mi propia marca"
+      ],
+      "expect": {
+        "channelCompliance": true,
+        "forbidden": [
+          "whatsapp",
+          "escríbanos por"
+        ],
+        "maxWords": 110
+      }
+    },
+    {
+      "id": "O005",
+      "category": "naturalness_channel",
+      "channel": "whatsapp",
+      "turns": [
+        "Hola",
+        "¿Qué presentaciones hay?"
+      ],
+      "expect": {
+        "maxWords": 130
+      }
+    },
+    {
+      "id": "O006",
+      "category": "naturalness_channel",
+      "channel": "instagram",
+      "displayName": "Sebastian Falcon",
+      "turns": [
+        "Hola"
+      ],
+      "expect": {
+        "forbidden": [
+          "Sebastian"
+        ],
+        "channelCompliance": true,
+        "maxWords": 60
+      }
+    }
+  ]
+}
