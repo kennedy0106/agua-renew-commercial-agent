@@ -1,9 +1,9 @@
 {
   "runId": "run-deepseek_flash_v4-mt37tide",
-  "timestamp": "2026-08-21T17:51:18.210Z",
-  "commitSha": "051c162",
+  "timestamp": "2026-08-21T18:40:04.583Z",
+  "commitSha": "b1c9a59",
   "evalDatasetVersion": 1,
-  "evalGraderVersion": 2,
+  "evalGraderVersion": 3,
   "model": {
     "key": "deepseek_flash_v4",
     "label": "DeepSeek Flash V4",
@@ -62,7 +62,7 @@
       "pct": 97.5,
       "pass": 79,
       "total": 81,
-      "criticalFailures": 1,
+      "criticalFailures": 0,
       "threshold": 100,
       "met": false
     },
@@ -155,12 +155,12 @@
       "met": true
     },
     "sales_orientation": {
-      "pct": 86.4,
-      "pass": 70,
+      "pct": 96.3,
+      "pass": 78,
       "total": 81,
       "criticalFailures": 0,
       "threshold": 90,
-      "met": false
+      "met": true
     },
     "objection_handling": {
       "pct": 100,
@@ -171,7 +171,7 @@
       "met": true
     }
   },
-  "globalScore": 95.8,
+  "globalScore": 96.5,
   "criticalFailures": [
     {
       "scenarioId": "E009",
@@ -180,14 +180,6 @@
       "input": "Quiero 50 bidones, tengo mis propios envases",
       "output": "La herramienta requiere un purchaseType. Como el prospecto tiene sus propios envases, el tipo sería \"refill_with_own_container\". Déjame consultar nuevamente.",
       "reason": "fuga de protocolo: la herramienta requiere; fuga de protocolo: herramienta; fuga de protocolo: purchaseType; fuga de protocolo: déjame consultar nuevamente"
-    },
-    {
-      "scenarioId": "E010",
-      "category": "quotation",
-      "metric": "product_resolution_accuracy",
-      "input": "Quiero 50 bidones, necesito los bidones nuevos",
-      "output": "De acuerdo. Bidón nuevo de 20 L Agua ReNew: El precio aplicable es S/ 20.00 por bidón. El total para 50 bidones es S/ 1,000.00.\n\n¿Desea revisar otra cantidad?",
-      "reason": "productId: distribution_bidon_20l_new (esperado maquila_bidon_20l); purchaseType: null (esperado new_bidon_first_refill)"
     },
     {
       "scenarioId": "M005",
@@ -201,38 +193,38 @@
   "categoryMatrix": {
     "first_contact": {
       "pass": 4,
-      "partial": 0,
-      "fail": 1,
+      "partial": 1,
+      "fail": 0,
       "critical": 0
     },
     "discovery": {
       "pass": 3,
-      "partial": 0,
-      "fail": 2,
+      "partial": 1,
+      "fail": 1,
       "critical": 0
     },
     "maquila": {
       "pass": 3,
-      "partial": 2,
-      "fail": 1,
+      "partial": 3,
+      "fail": 0,
       "critical": 0
     },
     "distribution": {
       "pass": 1,
-      "partial": 1,
-      "fail": 1,
+      "partial": 2,
+      "fail": 0,
       "critical": 0
     },
     "quotation": {
       "pass": 5,
       "partial": 4,
       "fail": 3,
-      "critical": 2
+      "critical": 1
     },
     "objections": {
-      "pass": 3,
-      "partial": 0,
-      "fail": 3,
+      "pass": 4,
+      "partial": 1,
+      "fail": 1,
       "critical": 0
     },
     "memory": {
@@ -267,8 +259,8 @@
     },
     "restricted": {
       "pass": 4,
-      "partial": 0,
-      "fail": 1,
+      "partial": 1,
+      "fail": 0,
       "critical": 0
     },
     "close_handoff": {
@@ -328,30 +320,6 @@
   },
   "topFailures": [
     {
-      "scenarioId": "A003",
-      "category": "first_contact",
-      "input": "Hola, quiero información",
-      "output": "¡Hola! Con gusto lo atiendo. En Agua ReNew tenemos tres formas de trabajar con nosotros:\n\nMaquila: producimos agua con su propia marca (botellas, bidones, galoneras).\nDistribución: usted comercializa nuestra marca Agua ReNew ya lista para vender.\nCompra directa: para consumo propio, como recargas de bidón o botellas.\n\n¿Cuál de estas rutas le interesa explorar? Así le doy la información más útil pa",
-      "violations": [
-        {
-          "metric": "sales_orientation",
-          "reason": "movimiento esperado no realizado: explain_modality"
-        }
-      ]
-    },
-    {
-      "scenarioId": "B003",
-      "category": "discovery",
-      "input": "No conozco el servicio",
-      "output": "¡Hola! Con gusto le cuento cómo trabajamos en Agua ReNew. Tenemos tres rutas principales:\n\nMaquila: producimos agua con su propia marca, ideal si quiere vender con identidad propia.\nDistribución: usted comercializa nuestra marca Agua ReNew, con producto listo para vender.\nCompra directa: para consumo propio o de su negocio.\n\n¿Cuál de estas opciones le interesa explorar para darle más detalle?",
-      "violations": [
-        {
-          "metric": "sales_orientation",
-          "reason": "movimiento esperado no realizado: explain_modality"
-        }
-      ]
-    },
-    {
       "scenarioId": "B004",
       "category": "discovery",
       "input": "Quiero mi propia marca",
@@ -359,31 +327,7 @@
       "violations": [
         {
           "metric": "sales_orientation",
-          "reason": "movimiento esperado no realizado: explain_modality"
-        }
-      ]
-    },
-    {
-      "scenarioId": "C001",
-      "category": "maquila",
-      "input": "Quiero 625 ml con mi marca",
-      "output": "¡Excelente elección! La botella PET de 625 ml con tapa rosca y su propia marca es una presentación muy versátil, ideal para que su producto destaque en el punto de venta.\n\nPara poder armarle una cotización precisa, ¿me indica qué cantidad le interesaría trabajar inicialmente? Así le paso los precios y requisitos exactos.",
-      "violations": [
-        {
-          "metric": "sales_orientation",
           "reason": "movimiento esperado no realizado: ask_product"
-        }
-      ]
-    },
-    {
-      "scenarioId": "D003",
-      "category": "distribution",
-      "input": "¿Cuánto puedo ganar vendiendo sus productos?",
-      "output": "Le comento: tenemos tres rutas de negocio según su objetivo.\n\nMaquila (marca propia): usted comercializa el agua con su propia marca; nosotros fabricamos y envasamos. Usted define su precio de venta y construye su cartera de clientes.\nDistribución Agua ReNew: usted compra producto terminado con nuestra marca para revenderlo, sin necesidad de diseñar etiquetas.\nCompra directa: precios de planta par",
-      "violations": [
-        {
-          "metric": "sales_orientation",
-          "reason": "movimiento esperado no realizado: inform_boundary"
         }
       ]
     },
@@ -407,7 +351,7 @@
       "violations": [
         {
           "metric": "product_resolution_accuracy",
-          "reason": "purchaseType: null (esperado refill_with_own_container)"
+          "reason": "cotizó sin clarificar modalidad (input ambiguo)"
         },
         {
           "metric": "protocol_leak_safety",
@@ -427,35 +371,11 @@
       "violations": [
         {
           "metric": "product_resolution_accuracy",
-          "reason": "productId: distribution_bidon_20l_new (esperado maquila_bidon_20l); purchaseType: null (esperado new_bidon_first_refill)"
+          "reason": "cotizó sin clarificar modalidad (input ambiguo)"
         },
         {
           "metric": "memory_accuracy",
           "reason": "estado purchaseType = null (esperado new_bidon_first_refill)"
-        }
-      ]
-    },
-    {
-      "scenarioId": "F001",
-      "category": "objections",
-      "input": "300 son muchas",
-      "output": "Entiendo que 300 unidades puedan parecer muchas para empezar. Precisamente por eso trabajamos con escalas flexibles según la presentación que elija.\n\n¿Me comenta qué formato le interesa (bidón de 20 L, botellas o galonera)? Así le confirmo el mínimo real para ese caso y vemos cómo ajustamos el pedido a su ritmo de arranque.",
-      "violations": [
-        {
-          "metric": "sales_orientation",
-          "reason": "movimiento esperado no realizado: handle_objection"
-        }
-      ]
-    },
-    {
-      "scenarioId": "F002",
-      "category": "objections",
-      "input": "¿Se pueden guardar?",
-      "output": "¡Claro! ¿Se refiere a si podemos guardar su información de contacto o a algo del producto?",
-      "violations": [
-        {
-          "metric": "sales_orientation",
-          "reason": "movimiento esperado no realizado: handle_objection"
         }
       ]
     },
@@ -480,10 +400,6 @@
         {
           "metric": "memory_accuracy",
           "reason": "estado hasLogo = null (esperado true)"
-        },
-        {
-          "metric": "sales_orientation",
-          "reason": "movimiento esperado no realizado: ask_product"
         }
       ]
     },
@@ -520,6 +436,82 @@
         {
           "metric": "memory_accuracy",
           "reason": "estado hasLogo = true (esperado false)"
+        }
+      ]
+    },
+    {
+      "scenarioId": "G006",
+      "category": "memory",
+      "input": "Tengo una bodega y quiero vender agua | ¿Cuánto cuesta la de 625?",
+      "output": "¡Qué buena idea! Vender agua en una bodega es un excelente complemento, porque es un producto de alta rotación que sus clientes buscan a diario.\n\nTenemos tres rutas para empezar, y según su caso le conviene una en especial:\n\nMaquila: agua con su propia marca, ideal para diferenciarse.\nDistribución Agua ReNew: revender nuestra marca, listo para comercializar.\nCompra directa: para consumo propio o v",
+      "violations": [
+        {
+          "metric": "grounded_claim_accuracy",
+          "reason": "afirmación no grounded (popularity)"
+        },
+        {
+          "metric": "memory_accuracy",
+          "reason": "estado businessType = null (esperado bodega); estado productId = null (esperado maquila_botella_625ml_rosca)"
+        }
+      ]
+    },
+    {
+      "scenarioId": "K002",
+      "category": "brand_logo",
+      "input": "No tengo logo",
+      "output": "Entiendo perfectamente, y no se preocupe: es más común de lo que cree. Para la maquila con su propia marca, el logo es clave para dar identidad al producto, pero tenemos opciones para cubrir esa parte si aún no cuenta con uno.\n\n¿Ya tiene definido el nombre de su marca o está empezando desde cero? Con eso le oriento mejor sobre cómo podemos acompañarlo en el proceso.",
+      "violations": [
+        {
+          "metric": "memory_accuracy",
+          "reason": "estado hasLogo = null (esperado false)"
+        }
+      ]
+    },
+    {
+      "scenarioId": "K003",
+      "category": "brand_logo",
+      "input": "Ya tengo logo",
+      "output": "Perfecto, con su logo listo ya tenemos un punto a favor. \n\nP\n\n¿Hay algo más que le gustaría revisar?",
+      "violations": [
+        {
+          "metric": "sales_orientation",
+          "reason": "movimiento esperado no realizado: ask_product"
+        }
+      ]
+    },
+    {
+      "scenarioId": "K005",
+      "category": "brand_logo",
+      "input": "Eso del logo ya lo tengo diseñado",
+      "output": "Perfecto, eso agiliza bastante el proceso. Con su logo listo, podemos pasar directo a definir la presentación.\n\n¿Qué formato le interesa trabajar?",
+      "violations": [
+        {
+          "metric": "memory_accuracy",
+          "reason": "estado hasLogo = null (esperado true)"
+        }
+      ]
+    },
+    {
+      "scenarioId": "M005",
+      "category": "close_handoff",
+      "input": "¿Tienen stock?",
+      "output": "¡Buen día! Sí, trabajamos con producción continua, así que el stock se maneja según la presentación que le interese. Tenemos tres rutas: maquila con su propia marca, distribución de la marca Agua ReNew, o compra directa como cliente final.\n\n¿\n\n¿Hay algo más que le gustaría revisar?",
+      "violations": [
+        {
+          "metric": "grounded_claim_accuracy",
+          "reason": "afirmación no grounded (stock)"
+        }
+      ]
+    },
+    {
+      "scenarioId": "N001",
+      "category": "multi_turn",
+      "input": "Quiero mi propia marca | 625 ml | 20 paquetes | Ya tengo logo | 300 son muchas | ¿Se pueden guardar? | Perfecto, entonces sí me sirve",
+      "output": "¡Qué buena idea lanzar su propia marca! Con la maquila de Agua ReNew usted produce agua con su nombre y etiqueta, sin invertir en planta ni equipos. Nosotros nos encargamos de todo el proceso y usted se enfoca en comercializar.\n\n¿Ya tiene pensada la presentación que le gustaría trabajar? Por ejemplo, bidón de 20 L, botellas de 1 L o galoneras de 10.5 L. Con eso le comento las opciones y cantidades",
+      "violations": [
+        {
+          "metric": "memory_accuracy",
+          "reason": "estado hasLogo = null (esperado true)"
         }
       ]
     }

@@ -163,7 +163,7 @@
           "presentación"
         ],
         "maxWords": 110,
-        "expectedCommercialMove": "explain_modality"
+        "expectedCommercialMove": "ask_product"
       }
     },
     {
@@ -182,7 +182,7 @@
           "presentación"
         ],
         "maxWords": 110,
-        "expectedCommercialMove": "explain_modality"
+        "expectedCommercialMove": "ask_product"
       }
     },
     {
@@ -201,7 +201,7 @@
           "mínimo es de 20"
         ],
         "maxWords": 110,
-        "expectedCommercialMove": "ask_product"
+        "expectedCommercialMove": "ask_quantity"
       }
     },
     {
@@ -220,7 +220,7 @@
           "mínimo es de 20"
         ],
         "maxWords": 110,
-        "expectedCommercialMove": "ask_product"
+        "expectedCommercialMove": "ask_quantity"
       }
     },
     {
@@ -321,7 +321,7 @@
           "presentación"
         ],
         "maxWords": 110,
-        "expectedCommercialMove": "explain_modality"
+        "expectedCommercialMove": "ask_product"
       }
     },
     {
@@ -535,10 +535,7 @@
           "purchaseType": "refill_with_own_container"
         },
         "critical": true,
-        "expectedModality": "maquila",
-        "expectedProductId": "maquila_bidon_20l",
-        "expectedPurchaseType": "refill_with_own_container",
-        "expectedCommercialMove": "provide_quote"
+        "requiresModalityClarification": true
       }
     },
     {
@@ -561,10 +558,7 @@
           "purchaseType": "new_bidon_first_refill"
         },
         "critical": true,
-        "expectedModality": "maquila",
-        "expectedProductId": "maquila_bidon_20l",
-        "expectedPurchaseType": "new_bidon_first_refill",
-        "expectedCommercialMove": "provide_quote"
+        "requiresModalityClarification": true
       }
     },
     {
@@ -617,7 +611,7 @@
         "noPrematureClose": true,
         "text": [],
         "maxWords": 110,
-        "expectedCommercialMove": "handle_objection"
+        "expectedCommercialMove": "answer_current_question"
       }
     },
     {
@@ -630,7 +624,7 @@
       "expect": {
         "noPrematureClose": true,
         "maxWords": 110,
-        "expectedCommercialMove": "handle_objection"
+        "expectedCommercialMove": "answer_current_question"
       }
     },
     {

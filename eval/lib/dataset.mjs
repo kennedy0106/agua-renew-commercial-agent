@@ -16,7 +16,7 @@ const EXPECT_KEYS = new Set([
   'tools', 'forbiddenTools', 'text', 'forbidden', 'forbiddenInLastTurn', 'paymentTransfer',
   'finalState', 'nextAction', 'noRepeatOf', 'noPrematureClose', 'maxWords', 'channelCompliance', 'critical',
   'expectedModality', 'expectedProductId', 'expectedPurchaseType', 'expectedCommercialMove',
-  'forbiddenGroundedClaims', 'allowedClaims', 'forbiddenProtocolTerms',
+  'forbiddenGroundedClaims', 'allowedClaims', 'forbiddenProtocolTerms', 'requiresModalityClarification',
 ]);
 
 export function validateScenario(scenario, index) {

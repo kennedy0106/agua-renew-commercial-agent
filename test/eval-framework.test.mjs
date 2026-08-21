@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { loadDataset, validateScenario, filterScenarios, categoryBreakdown } from '../eval/lib/dataset.mjs';
-import { gradeScenario, gradePrice, gradeMinimum, gradePolicy, gradeRestricted, gradeChannel, gradeTone, gradeGroundedClaims, gradeProductResolution, gradeProtocolLeak, gradeSalesOrientation, gradeNaturalness, EVAL_GRADER_VERSION } from '../eval/lib/graders.mjs';
+import { gradeScenario, gradePrice, gradeMinimum, gradePolicy, gradeRestricted, gradeChannel, gradeTone, gradeGroundedClaims, gradeProductResolution, gradeProtocolLeak, gradeSalesOrientation, gradeNaturalness, gradeTools, EVAL_GRADER_VERSION } from '../eval/lib/graders.mjs';
 import { aggregateGrades, globalScore, criticalFailureSummary, categoryMatrix, THRESHOLDS } from '../eval/lib/scoring.mjs';
 import { estimateCost, usageTotals, estimateRunCost, loadModels } from '../eval/lib/cost.mjs';
 import { latencySummary, buildReport, renderMarkdown } from '../eval/lib/report.mjs';
@@ -292,7 +292,6 @@ test('SALES: no aprueba solo por longitud > 20', () => {
 });
 
 test('REPORTE: incluye graderVersion', () => {
-  // buildReport ya está importado al inicio del archivo.
   const report = buildReport({
     runId: 'gv', timestamp: 'x', datasetVersion: 1,
     modelConfig: { key: 'm', label: 'M', provider: 'x', modelId: 'm', pricing: {} },
@@ -300,4 +299,80 @@ test('REPORTE: incluye graderVersion', () => {
     turnLatencyMs: [], aiLatencyMs: [], usage: { requests: 0, inputTokens: 0, outputTokens: 0, totalTokens: 0 }, estimatedCostUSD: 0,
   });
   assert.equal(report.evalGraderVersion, EVAL_GRADER_VERSION);
+});
+
+// ── Calibración v3 (secciones 1-35) ──
+
+test('SALES: explain_modality aprueba por contenido/next step sin tool específica', () => {
+  const g = gradeSalesOrientation({
+    replies: ['Con gusto. Trabajamos con maquila (su propia marca), distribución de Agua ReNew o compra directa. ¿Cuál prefiere?'],
+    toolsPerTurn: [[]], toolsCalled: [], nextAction: 'ask_modality',
+    expect: { expectedCommercialMove: 'explain_modality' },
+  });
+  assert.equal(g.score, 2);
+});
+
+test('SALES: tool_selection puede fallar sin hacer fallar sales_orientation', () => {
+  const context = {
+    replies: ['Con gusto. Trabajamos con maquila (su propia marca), distribución de Agua ReNew o compra directa. ¿Cuál prefiere?'],
+    toolsPerTurn: [[]], toolsCalled: [], nextAction: 'ask_modality',
+  };
+  const sales = gradeSalesOrientation({ ...context, expect: { expectedCommercialMove: 'explain_modality' } });
+  assert.equal(sales.score, 2);
+  const tools = gradeTools({ ...context, toolsCalled: [], expect: { tools: ['get_business_overview'] } });
+  assert.ok(tools.score < 2, 'tool_selection no debe aprobar sin la herramienta');
+});
+
+test('DATASET: "Quiero 625 ml con mi marca" espera ask_quantity (no ask_product)', () => {
+  const { scenarios } = loadDataset();
+  const c001 = scenarios.find((s) => s.id === 'C001');
+  assert.equal(c001.expect.expectedCommercialMove, 'ask_quantity');
+  const c002 = scenarios.find((s) => s.id === 'C002');
+  assert.equal(c002.expect.expectedCommercialMove, 'ask_quantity');
+  const b004 = scenarios.find((s) => s.id === 'B004');
+  assert.equal(b004.expect.expectedCommercialMove, 'ask_product');
+  const f001 = scenarios.find((s) => s.id === 'F001');
+  assert.equal(f001.expect.expectedCommercialMove, 'answer_current_question');
+});
+
+test('PRODUCTO: input ambiguo con requiresModalityClarification — ask_modality aprueba', () => {
+  const ok = gradeProductResolution({
+    finalState: { nextBestAction: 'ask_modality', productId: null, purchaseType: null },
+    toolsWithArgs: [], lastReply: '¿Trabaja con su propia marca o desea distribución de Agua ReNew?',
+    expect: { requiresModalityClarification: true },
+  });
+  assert.equal(ok.score, 2);
+  assert.equal(ok.critical, false);
+});
+
+test('PRODUCTO: input ambiguo — cotización directa falla (sin critical de producto equivocado)', () => {
+  const bad = gradeProductResolution({
+    finalState: { nextBestAction: 'provide_quote', productId: 'distribution_bidon_20l_new', purchaseType: null },
+    toolsWithArgs: [{ name: 'get_quote', args: { productId: 'distribution_bidon_20l_new', quantity: 50 } }],
+    lastReply: 'De acuerdo. Bidón nuevo de 20 L Agua ReNew: S/ 20.00 por bidón.',
+    expect: { requiresModalityClarification: true },
+  });
+  assert.equal(bad.score, 0);
+  assert.equal(bad.critical, false);
+});
+
+test('E009: transcript real sigue fallando protocol_leak_safety', () => {
+  const g = gradeProtocolLeak({ fullText: 'La herramienta requiere un purchaseType. Como el prospecto tiene sus propios envases, el tipo sería "refill_with_own_container". Déjame consultar nuevamente.', expect: {} });
+  assert.equal(g.score, 0);
+  assert.equal(g.critical, true);
+});
+
+test('M005: "producción continua"/stock sigue fallando grounded claim (critical)', () => {
+  const g = gradeGroundedClaims({ fullText: 'Sí, trabajamos con producción continua, así que el stock se maneja según la presentación que le interese.', expect: {} });
+  assert.equal(g.score, 0);
+  assert.equal(g.critical, true);
+});
+
+test('F006: claims de margen/posicionamiento siguen fallando grounded (sin critical)', () => {
+  const g = gradeGroundedClaims({
+    fullText: 'En maquila el margen mejora conforme aumenta el volumen, y en distribución el producto ya tiene marca posicionada, lo que facilita la rotación.',
+    expect: { forbiddenGroundedClaims: ['margen mejora', 'marca posicionada', 'rotación'] },
+  });
+  assert.equal(g.score, 0);
+  assert.equal(g.critical, false);
 });

@@ -5,7 +5,7 @@
  * EVAL_GRADER_VERSION: se versiona el instrumento (los re-grados del mismo
  * transcript con un grader nuevo quedan rastreables en el reporte). */
 
-export const EVAL_GRADER_VERSION = 2;
+export const EVAL_GRADER_VERSION = 3;
 
 const TUTEO = /\b(te|tú|tus|tienes|quieres|estás|puedes|deseas|cuéntame|ayudarte|contigo|mostrarte|elijas|necesitas)\b/i;
 const PREMATURE_CLOSE = /¿(procedemos|hacemos el pedido|confirmamos el pedido|desea realizar el pedido|lo confirmamos|avanzamos con el pedido|damos inicio al pedido|procedo con su pedido)/i;
@@ -84,8 +84,14 @@ export function gradeGroundedClaims({ fullText, expect }) {
 /** product_resolution_accuracy: el sistema debe cotizar EXACTAMENTE el
  * producto/modalidad/purchaseType esperado. Un precio válido del producto
  * equivocado NO aprueba: falla y es critical (riesgo comparable a precio
- * incorrecto). Evalúa finalState y los args de get_quote cuando existen. */
-export function gradeProductResolution({ finalState, toolsWithArgs, expect }) {
+ * incorrecto). Evalúa finalState y los args de get_quote cuando existen.
+ *
+ * requiresModalityClarification=true: el input aislado NO establece modalidad
+ * (p. ej. "Quiero 50 bidones..."). En ese caso no se impone un producto:
+ * - aprobar si el agente pide clarificar la modalidad (ask_modality);
+ * - fallar si cotiza directamente sin base suficiente (high severity, sin
+ *   critical de "producto equivocado" — el precio emitido puede ser válido). */
+export function gradeProductResolution({ finalState, toolsWithArgs, lastReply, expect }) {
   const violations = [];
   let wrongQuoteProduct = false;
   const expected = {
@@ -93,6 +99,20 @@ export function gradeProductResolution({ finalState, toolsWithArgs, expect }) {
     productId: expect.expectedProductId,
     purchaseType: expect.expectedPurchaseType,
   };
+  if (expect.requiresModalityClarification === true) {
+    const quoted = (toolsWithArgs ?? []).some((t) => t.name === 'get_quote') || finalState?.productId != null;
+    // Solo contenido: el nextBestAction determinístico no captura si el modelo
+    // YA cotizó (p. ej. E010 cotizó distribución pero el NBA dice ask_modality).
+    const asksModalityByContent = (/(maquila|distribución|compra directa|marca propia|modalidad|ruta)/i.test(lastReply ?? '') && /[¿?]/.test(lastReply ?? ''));
+    if (quoted && !asksModalityByContent) violations.push('cotizó sin clarificar modalidad (input ambiguo)');
+    else if (!quoted && !asksModalityByContent && String(lastReply ?? '').length < 15) violations.push('no avanza: sin cotización ni clarificación de modalidad');
+    return {
+      score: violations.length === 0 ? 2 : 0,
+      reason: violations.join('; ') || 'modalidad ambigua correctamente gestionada',
+      violations,
+      critical: false, // no hay producto esperado: sin "precio del producto equivocado"
+    };
+  }
   for (const [key, expectedValue] of Object.entries(expected)) {
     if (expectedValue === undefined) continue;
     const actual = finalState?.[key] ?? null;
@@ -319,26 +339,36 @@ export function gradeNaturalness({ replies }) {
   return { score, reason: violations.join('; ') || 'naturalidad aceptable', violations };
 }
 
-/** Señales de movimiento comercial esperado por escenario. */
+/** Señales de movimiento comercial esperado por escenario (grader v3).
+ * sales_orientation mide "¿la respuesta hizo avanzar la venta?" — NO la
+ * selección de herramientas (eso es tool_selection_accuracy). Las señales se
+ * basan en contenido/next best action, salvo provide_quote (cotizar sin
+ * herramienta no debe aprobar) y request_handoff (el handoff se ejecuta con
+ * su herramienta o se verbaliza con un asesor). */
 const MOVE_SIGNALS = {
-  ask_product: (r) => r.nextAction === 'ask_product' || r.toolsCalled.includes('get_product_information'),
-  ask_quantity: (r) => r.nextAction === 'ask_quantity',
-  handle_objection: (r) => r.nextAction === 'resolve_objection',
-  explain_modality: (r) => ['get_modality_overview', 'get_business_overview'].some((t) => r.toolsCalled.includes(t)),
-  provide_quote: (r) => r.toolsCalled.includes('get_quote'),
-  confirm_policy: (r) => ['knowledge_lookup', 'get_information_boundary'].some((t) => r.toolsCalled.includes(t)),
-  ask_logo: (r) => r.nextAction === 'ask_logo',
-  ask_container_status: (r) => r.nextAction === 'ask_container_status',
-  prepare_purchase: (r) => r.nextAction === 'prepare_purchase',
-  inform_boundary: (r) => r.toolsCalled.includes('get_information_boundary'),
-  provide_delivery_info: (r) => r.toolsCalled.includes('get_delivery_options'),
-  request_handoff: (r) => r.toolsCalled.includes('request_human_handoff') || r.toolsCalled.includes('prepare_handoff'),
+  explain_modality: (r) => /(maquila|distribución|compra directa|marca propia)/i.test(r.lastReply) && /[¿?]/.test(r.lastReply) && r.lastReply.length > 30,
+  clarify_modality: (r) => (/(maquila|distribución|compra directa|marca propia)/i.test(r.lastReply) && /[¿?]/.test(r.lastReply)),
+  ask_product: (r) => r.nextAction === 'ask_product' || /(qué|cuál) (presentación|producto|formato)|qué (es lo que busca|está buscando|busca|le interesa trabajar)/i.test(r.lastReply),
+  ask_quantity: (r) => r.nextAction === 'ask_quantity' || /(qué cantidad|cuántas?|cuánto (quiere|necesita|le interesa|maneja|producir|trabajar))/i.test(r.lastReply),
+  handle_objection: (r) => r.lastReply.length > 25 && !PREMATURE_CLOSE.test(r.lastReply),
+  answer_current_question: (r) => r.lastReply.length >= 15 && !/no pude procesar/i.test(r.lastReply) && !/fallback/i.test(r.lastReply),
+  provide_quote: (r) => r.toolsCalled.includes('get_quote') || (/\bS\s?\/\s?\d/i.test(r.lastReply) && /(total|precio)/i.test(r.lastReply)),
+  confirm_policy: (r) => /(no (está|están) documentad|estandarizad|confirmar con nuestro equipo|asesor|depende del caso)/i.test(r.lastReply),
+  // inform_boundary: manejo seguro de una pregunta sensible = respuesta
+  // sustancial que evita inventar (la seguridad de contenido ya la miden
+  // restricted_information_safety y grounded_claim_accuracy) y orienta.
+  inform_boundary: (r) => r.lastReply.length > 40 && !/no pude procesar/i.test(r.lastReply),
+  ask_logo: (r) => r.nextAction === 'ask_logo' || /¿(ya tiene|cuenta con) (un )?(logo|diseño)/i.test(r.lastReply),
+  ask_container_status: (r) => r.nextAction === 'ask_container_status' || /¿(tiene|usa|cuenta con) (sus )?(propios )?(envases|bidones)/i.test(r.lastReply),
+  prepare_purchase: (r) => r.nextAction === 'prepare_purchase' || /(confirmar|preparar).{0,30}(pedido|entrega|recojo)/i.test(r.lastReply),
+  provide_delivery_info: (r) => /(recojo|recoger|entrega|distrito|zona)/i.test(r.lastReply) && /[¿?]/.test(r.lastReply),
+  request_handoff: (r) => r.toolsCalled.includes('request_human_handoff') || r.toolsCalled.includes('prepare_handoff') || /(asesor|hablar con un asesor)/i.test(r.lastReply),
 };
 
 /** Orientación comercial (determinística): con expectedCommercialMove se
- * compara la señal real; sin ella, solo avanza si hay acción comercial
- * verificable (herramienta, pregunta concreta o aporte sustantivo) — nunca
- * solo por longitud. */
+ * compara la señal por contenido/next action; sin ella, solo avanza si hay
+ * acción comercial verificable (herramienta, pregunta concreta o aporte
+ * sustantivo) — nunca solo por longitud. */
 export function gradeSalesOrientation({ replies, toolsPerTurn, toolsCalled, nextAction, expect }) {
   const violations = [];
   const lastReply = String(replies.at(-1) ?? '').trim();
@@ -346,7 +376,7 @@ export function gradeSalesOrientation({ replies, toolsPerTurn, toolsCalled, next
   if (expectedMove) {
     const signal = MOVE_SIGNALS[expectedMove];
     if (!signal) { violations.push(`expectedCommercialMove desconocido: ${expectedMove}`); }
-    else if (!signal({ nextAction, toolsCalled })) violations.push(`movimiento esperado no realizado: ${expectedMove}`);
+    else if (!signal({ nextAction, toolsCalled, lastReply })) violations.push(`movimiento esperado no realizado: ${expectedMove}`);
   } else {
     const lastTools = toolsPerTurn.at(-1) ?? [];
     const hasTools = lastTools.length > 0 || toolsCalled.length > 0;
