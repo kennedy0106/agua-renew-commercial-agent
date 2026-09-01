@@ -1,0 +1,76 @@
+/* Motion polish: one ambient water layer, short entrances and interruptible feedback. */
+.login-water::after,
+.caustic {
+  animation: none;
+}
+
+.b2,
+.b4,
+.b6 {
+  display: none;
+}
+
+.login-hero {
+  animation: login-surface-in .28s var(--ease) both;
+}
+
+.login-form-shell {
+  animation: login-surface-in .28s .04s var(--ease) both;
+}
+
+@keyframes login-surface-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.login-submit {
+  transition: transform .16s var(--ease), box-shadow .16s ease;
+}
+
+.login-submit::before {
+  transition: transform .2s cubic-bezier(.77,0,.175,1);
+}
+
+@media (hover:hover) and (pointer:fine) {
+  .login-submit:hover {
+    filter: none;
+  }
+
+  .login-submit:hover::before {
+    animation: none;
+    transform: translateX(75%);
+  }
+}
+
+@media (prefers-reduced-motion:reduce) {
+  .login-water::before,
+  .login-water::after,
+  .caustic,
+  .bubble,
+  .login-hero,
+  .login-form-shell {
+    animation: none !important;
+    transform: none !important;
+  }
+
+  .login-submit,
+  .password-toggle,
+  .field-control {
+    transition: none !important;
+  }
+
+  .login-submit:hover,
+  .login-submit:active {
+    transform: none !important;
+  }
+
+  .login-submit::before {
+    display: none;
+  }
+}

@@ -9,7 +9,7 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 const migrationDirectory = join(root, 'database', 'migrations');
 // Conexión siempre desde entorno; el valor de desarrollo local va en .env
 // (ver .env.example y docker-compose.yml).
-const connectionString = process.env.DATABASE_URL;
+const connectionString = process.env.DATABASE_URL_UNPOOLED ?? process.env.DATABASE_URL;
 
 export async function runMigrations(pool) {
   await pool.query(`CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -42,6 +42,18 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     console.error('DATABASE_URL no está definida. Copie .env.example a .env y configúrela antes de migrar.');
     process.exitCode = 1;
   } else {
+    const databaseUrl = new URL(connectionString);
+    const host = databaseUrl.hostname;
+    if (host.includes('-pooler')) {
+      console.error('Las migraciones requieren DATABASE_URL_UNPOOLED (endpoint Neon directo, sin -pooler).');
+      process.exitCode = 1;
+      process.exit();
+    }
+    if (databaseUrl.searchParams.get('sslmode') !== 'verify-full') {
+      console.error('DATABASE_URL_UNPOOLED debe configurar sslmode=verify-full.');
+      process.exitCode = 1;
+      process.exit();
+    }
     const repository = new PostgresConversationRepository({ connectionString });
     try {
       await repository.connect();

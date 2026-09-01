@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#dceeff">
+  <title>Acceso · Agua ReNew</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/login.css">
+  <link rel="stylesheet" href="/login-motion.css">
+</head>
+<body>
+  <main class="login-stage">
+    <div class="login-water" aria-hidden="true"><span class="caustic"></span><span class="bubble b1"></span><span class="bubble b2"></span><span class="bubble b3"></span><span class="bubble b4"></span><span class="bubble b5"></span><span class="bubble b6"></span></div>
+    <div class="login-grid">
+      <section class="login-hero" aria-labelledby="brand-title">
+        <img class="login-wordmark" src="/brand/logo-renew.svg" alt="Agua ReNew" width="184" height="50">
+        <div class="brand-accent" aria-hidden="true"></div>
+        <h1 id="brand-title">Conversaciones que fluyen<br><span>hacia WhatsApp.</span></h1>
+        <p>Revisa conversaciones de Meta, completa los datos y deriva cada oportunidad a WhatsApp desde un solo lugar.</p>
+        <ul>
+          <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3 1.7-5.1A8 8 0 1 1 21 15Z"/></svg><span>Conversaciones y contexto comercial</span></li>
+          <li><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>Sincronización en hora Lima</span></li>
+          <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/></svg><span>Acceso protegido para el equipo</span></li>
+        </ul>
+        <p class="brand-message">Agua que renueva · Espíritu que transforma</p>
+      </section>
+      <section class="login-form-shell" aria-labelledby="login-title">
+        <div class="form-brand"><img src="/brand/logo-gotita.svg" alt="" width="42" height="42"></div>
+        <div class="form-heading"><h2 id="login-title">Iniciar sesión</h2><p>Entra con tu clave de Agua ReNew para continuar con los prospectos.</p></div>
+        <form id="login" novalidate>
+          <div class="field">
+            <label for="password">Clave administrativa</label>
+            <div class="field-control">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+              <input id="password" type="password" autocomplete="current-password" placeholder="Tu clave" required autofocus aria-describedby="error">
+              <button id="toggle-password" class="password-toggle" type="button" aria-label="Mostrar contraseña">
+                <svg class="eye-open" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="2.6"/></svg>
+                <svg class="eye-closed" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 3 18 18M10.6 6.1A11 11 0 0 1 12 6c6.5 0 10 6 10 6a16 16 0 0 1-2.1 2.7M6.2 6.2C3.4 8 2 12 2 12s3.5 6 10 6a10.6 10.6 0 0 0 4-.8"/></svg>
+              </button>
+            </div>
+          </div>
+          <button id="submit" class="login-submit" type="submit"><span class="submit-label">Ingresar al sistema</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M14 7l5 5-5 5"/></svg></button>
+          <div id="error" role="alert" aria-live="assertive"></div>
+        </form>
+        <div class="form-foot"><img src="/brand/logo-gotita.svg" alt="" width="14" height="14"><span>Acceso solo para el equipo Agua ReNew. Tu sesión protege los prospectos.</span></div>
+      </section>
+    </div>
+  </main>
+  <script src="/login.js"></script>
+</body>
+</html>

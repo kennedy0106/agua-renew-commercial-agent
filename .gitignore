@@ -1,5 +1,7 @@
 # ── Dependencias ──────────────────────────────────────────────
 node_modules/
+.backfill/
+.runtime/
 
 # ── Entorno y secretos ────────────────────────────────────────
 .env

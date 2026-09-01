@@ -4,11 +4,7 @@ import test from 'node:test';
 import { ConversationEngine } from '../src/conversation/conversation-engine.mjs';
 import { PostgresConversationRepository } from '../src/repository/postgres-conversation-repository.mjs';
 import { runMigrations } from '../scripts/migrate.mjs';
-import { loadEnvironment } from '../src/config/environment.mjs';
-
-loadEnvironment();
-const enabled = process.env.RUN_POSTGRES_TESTS === '1' && Boolean(process.env.DATABASE_URL);
-const connectionString = process.env.DATABASE_URL;
+import { enabled, connectionString } from './postgres-test-config.mjs';
 
 async function choose(engine, type, value) {
   return engine.dispatch({ type, value });
@@ -16,10 +12,11 @@ async function choose(engine, type, value) {
 
 test('PostgreSQL persiste conversación, mensajes, cotización y handoff', { skip: !enabled }, async () => {
   const repository = new PostgresConversationRepository({ connectionString });
+  let customerExternalId = null;
   await repository.connect();
   try {
     await runMigrations(repository.pool);
-    const customerExternalId = `integration-${randomUUID()}`;
+    customerExternalId = `integration-${randomUUID()}`;
     const first = new ConversationEngine({ repository });
     await first.initialize({ customerExternalId });
     await choose(first, 'select_family', 'botella_1l_fliptop');
@@ -64,6 +61,10 @@ test('PostgreSQL persiste conversación, mensajes, cotización y handoff', { ski
     assert.equal(handoffs.length, 1);
     assert.deepEqual(handoffs[0].ambiguity_ids, ['maquila_galonera_scope']);
   } finally {
+    if (customerExternalId) {
+      await repository.pool?.query('DELETE FROM conversations WHERE customer_id IN (SELECT id FROM customers WHERE external_id = $1)', [customerExternalId]);
+      await repository.pool?.query('DELETE FROM customers WHERE external_id = $1', [customerExternalId]);
+    }
     await repository.close();
   }
 });

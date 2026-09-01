@@ -8,10 +8,14 @@
   },
   "scripts": {
     "test": "node --test",
-    "test:postgres": "set RUN_POSTGRES_TESTS=1&& node --test",
+    "test:postgres": "node --test test/lead-postgres.integration.test.mjs test/postgres-persistence.integration.test.mjs",
     "test:deepseek": "set RUN_DEEPSEEK_TESTS=1&& node --test test/deepseek.integration.test.mjs",
     "start:simulator": "node apps/simulator/server.mjs",
+    "start:meta": "node apps/meta-server/server.mjs",
+    "mock:meta": "node scripts/mock-meta.mjs",
     "migrate": "node scripts/migrate.mjs",
+    "backfill:leads": "node scripts/backfill-leads.mjs --dry-run",
+    "backfill:leads:apply": "node scripts/backfill-leads.mjs --apply",
     "eval": "node eval/cli.mjs --run",
     "eval:dry": "node eval/cli.mjs --dry",
     "eval:compare": "node eval/cli.mjs --compare"
