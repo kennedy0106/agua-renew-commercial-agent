@@ -13,6 +13,7 @@ export class InMemoryLeadRepository extends LeadRepository {
     this.eventsByLead = new Map();
     this.phoneHistoryByLead = new Map();
     this.messageSeq = 0;
+    this.analysisJobs = new Map();
   }
 
   async createLead(data) {
@@ -101,7 +102,38 @@ export class InMemoryLeadRepository extends LeadRepository {
     };
     if (!this.messagesByLead.has(leadId)) this.messagesByLead.set(leadId, []);
     this.messagesByLead.get(leadId).push(message);
+    if (direction === 'inbound') {
+      const job = this.analysisJobs.get(leadId) ?? { leadId, requestedVersion: 0, completedVersion: 0, attemptCount: 0 };
+      this.analysisJobs.set(leadId, { ...job, requestedVersion: job.requestedVersion + 1, status: 'PENDING', nextAttemptAt: new Date(), lockedAt: null });
+    }
     return { ...clone(message), wasInserted: true };
+  }
+
+  async claimAnalysisJobs({ limit = 10, now = new Date(), leaseMs = 120_000 } = {}) {
+    const claimed = [];
+    for (const job of this.analysisJobs.values()) {
+      const stale = job.status === 'PROCESSING' && job.lockedAt && now - new Date(job.lockedAt) >= leaseMs;
+      if (stale) { job.status = 'FAILED'; job.nextAttemptAt = now; job.lockedAt = null; }
+      if (claimed.length < limit && ['PENDING','FAILED'].includes(job.status) && new Date(job.nextAttemptAt) <= now) {
+        job.status = 'PROCESSING'; job.attemptCount += 1; job.lockedAt = now; claimed.push(clone(job));
+      }
+    }
+    return claimed;
+  }
+
+  async completeAnalysisJob(leadId, version) {
+    const job = this.analysisJobs.get(leadId); if (!job) return false;
+    job.completedVersion = Math.max(job.completedVersion, version); job.lockedAt = null; job.attemptCount = 0;
+    job.status = job.requestedVersion > version ? 'PENDING' : 'PENDING';
+    job.nextAttemptAt = job.requestedVersion > version ? new Date() : new Date(8640000000000000);
+    return true;
+  }
+
+  async failAnalysisJob(leadId, version, { nextAttemptAt, error, maxAttempts = 5 }) {
+    const job = this.analysisJobs.get(leadId); if (!job || job.requestedVersion !== version) return false;
+    job.lockedAt = null; job.lastError = String(error ?? '').slice(0,500);
+    job.status = job.attemptCount >= maxAttempts ? 'EXHAUSTED' : 'FAILED'; job.nextAttemptAt = nextAttemptAt;
+    return true;
   }
 
   async listMessages(leadId) {

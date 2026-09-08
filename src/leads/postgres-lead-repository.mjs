@@ -176,7 +176,36 @@ export class PostgresLeadRepository extends LeadRepository {
       [leadId, channel, direction, actorType, actorId, externalMessageId, content,
         deliveryStatus, purpose, providerMessageId, sourceCreatedAt],
     );
+    if (direction === 'inbound' && result.rows[0]?.was_inserted) {
+      await this.pool.query(`INSERT INTO lead_analysis_jobs (lead_id) VALUES ($1)
+        ON CONFLICT (lead_id) DO UPDATE SET requested_version=lead_analysis_jobs.requested_version+1,status='PENDING',next_attempt_at=now(),locked_at=NULL,updated_at=now()`, [leadId]);
+    }
     return result.rows[0] ? mapMessage(result.rows[0]) : null;
+  }
+
+  async claimAnalysisJobs({ limit = 10, leaseMs = 120_000 } = {}) {
+    const client = await this.pool.connect();
+    try { await client.query('BEGIN');
+      await client.query(`UPDATE lead_analysis_jobs SET status='FAILED',next_attempt_at=now(),locked_at=NULL,updated_at=now()
+        WHERE status='PROCESSING' AND locked_at < now()-($1::int*interval '1 millisecond')`,[leaseMs]);
+      const result = await client.query(`WITH due AS (SELECT lead_id FROM lead_analysis_jobs
+        WHERE status IN ('PENDING','FAILED') AND next_attempt_at<=now() ORDER BY next_attempt_at FOR UPDATE SKIP LOCKED LIMIT $1)
+        UPDATE lead_analysis_jobs j SET status='PROCESSING',attempt_count=attempt_count+1,locked_at=now(),updated_at=now()
+        FROM due WHERE j.lead_id=due.lead_id RETURNING j.lead_id AS "leadId",j.requested_version AS "requestedVersion",j.attempt_count AS "attemptCount"`,[limit]);
+      await client.query('COMMIT'); return result.rows;
+    } catch(error){await client.query('ROLLBACK');throw error;} finally{client.release();}
+  }
+
+  async completeAnalysisJob(leadId, version) {
+    const result=await this.pool.query(`UPDATE lead_analysis_jobs SET completed_version=GREATEST(completed_version,$2),attempt_count=0,locked_at=NULL,
+      status='PENDING',next_attempt_at=CASE WHEN requested_version>$2 THEN now() ELSE 'infinity'::timestamptz END,updated_at=now()
+      WHERE lead_id=$1 RETURNING lead_id`,[leadId,version]); return Boolean(result.rowCount);
+  }
+
+  async failAnalysisJob(leadId, version, { nextAttemptAt, error, maxAttempts = 5 }) {
+    const result=await this.pool.query(`UPDATE lead_analysis_jobs SET status=CASE WHEN attempt_count >= $4 THEN 'EXHAUSTED' ELSE 'FAILED' END,
+      next_attempt_at=$3,locked_at=NULL,last_error=$5,updated_at=now() WHERE lead_id=$1 AND requested_version=$2 RETURNING lead_id`,
+    [leadId,version,nextAttemptAt,maxAttempts,String(error??'').slice(0,500)]); return Boolean(result.rowCount);
   }
 
   async listMessages(leadId) {

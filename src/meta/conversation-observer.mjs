@@ -18,17 +18,6 @@ export class ConversationObserver {
     }
   }
 
-  #deferAnalysis(key, leadId) {
-    queueMicrotask(() => {
-      const previous = this.locks.get(key) ?? Promise.resolve();
-      const current = previous.catch(() => {}).then(() => this.processor.process(leadId));
-      this.locks.set(key, current);
-      current.catch((error) => console.error('[lead-analysis]', error?.message ?? error)).finally(() => {
-        if (this.locks.get(key) === current) this.locks.delete(key);
-      });
-    });
-  }
-
   async #observe(event) {
     const key = `${event.channel}:${event.sourceConversationId}`;
     let lead = await this.repository.findLeadByExternalConversation({
@@ -86,7 +75,6 @@ export class ConversationObserver {
       return { lead, created, duplicate: false, processed: false, message: stored };
     }
     if (event.deferProcessing === true) {
-      this.#deferAnalysis(key, lead.id);
       return { lead, created, duplicate: false, processed: false, deferred: true, message: stored };
     }
     const processed = await this.processor.process(lead.id);

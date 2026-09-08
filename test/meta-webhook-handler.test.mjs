@@ -200,6 +200,14 @@ test('webhook: sin appSecret configurado no exige firma', async () => {
   assert.equal(leads.length, 1);
 });
 
+test('webhook: modo estricto sin secreto rechaza antes de escribir', async () => {
+  const { repository, observer } = makeHandler({ appSecret: null });
+  const handler = new MetaWebhookHandler({ verifyToken: 'verify-token', appSecret: null, requireSignature: true, observer, repository });
+  const rawBody = igPayload('strict-mid', 'Quiero 20 litros');
+  assert.deepEqual(await handler.handle({ rawBody, signature: null }), { error: 'invalid_signature' });
+  assert.equal((await repository.listLeads({})).length, 0);
+});
+
 test('webhook: webhook duplicado no duplica mensajes (idempotencia)', async () => {
   const { handler, repository } = makeHandler();
   const rawBody = igPayload('mid-5', 'Quiero 20 litros');

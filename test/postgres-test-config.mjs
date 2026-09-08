@@ -12,6 +12,8 @@ if (enabled && new URL(connectionString).hostname.includes('-pooler')) {
   throw new Error('TEST_DATABASE_URL debe ser directa porque la suite aplica migraciones.');
 }
 
-if (enabled && new URL(connectionString).searchParams.get('sslmode') !== 'verify-full') {
+const testUrl = enabled ? new URL(connectionString) : null;
+const localTestDatabase = testUrl && ['localhost','127.0.0.1','::1'].includes(testUrl.hostname);
+if (enabled && !localTestDatabase && testUrl.searchParams.get('sslmode') !== 'verify-full') {
   throw new Error('TEST_DATABASE_URL debe configurar sslmode=verify-full.');
 }

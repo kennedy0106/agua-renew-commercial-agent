@@ -7,10 +7,11 @@ import { ConversationOriginResolver } from './conversation-origin-resolver.mjs';
  * de eventos y despacho al ConversationObserver (idempotente y sin escritura en Meta).
  */
 export class MetaWebhookHandler {
-  constructor({ verifyToken, appSecret = null, observer, repository, originResolver = new ConversationOriginResolver(), profileResolver = null, deferProcessing = false }) {
+  constructor({ verifyToken, appSecret = null, requireSignature = false, observer, repository, originResolver = new ConversationOriginResolver(), profileResolver = null, deferProcessing = false }) {
     if (!verifyToken) throw new Error('META_VERIFY_TOKEN es requerido');
     this.verifyToken = verifyToken;
     this.appSecret = appSecret;
+    this.requireSignature = requireSignature;
     this.observer = observer;
     this.repository = repository;
     this.originResolver = originResolver;
@@ -27,7 +28,7 @@ export class MetaWebhookHandler {
   }
 
   #validSignature(rawBody, signatureHeader) {
-    if (!this.appSecret) return true; // sin secreto configurado no se exige firma
+    if (!this.appSecret) return !this.requireSignature;
     if (typeof rawBody !== 'string' || !signatureHeader) return false;
     const expected = `sha256=${createHmac('sha256', this.appSecret).update(rawBody).digest('hex')}`;
     const a = Buffer.from(expected);

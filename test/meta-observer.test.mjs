@@ -3,6 +3,7 @@ import test from 'node:test';
 import { InMemoryLeadRepository } from '../src/leads/in-memory-lead-repository.mjs';
 import { LeadProcessor } from '../src/meta/lead-processor.mjs';
 import { ConversationObserver } from '../src/meta/conversation-observer.mjs';
+import { AnalysisWorker } from '../src/meta/analysis-worker.mjs';
 import { ObserverLeadService } from '../src/leads/observer-lead-service.mjs';
 import { LeadsApi } from '../src/admin/leads-api.mjs';
 
@@ -87,7 +88,7 @@ test('observer puede confirmar el webhook antes de terminar el análisis de IA',
   assert.equal(observed.deferred, true);
   assert.equal(observed.lead.processingVersion, null);
   release();
-  await new Promise((resolve) => setTimeout(resolve, 10));
+  await new AnalysisWorker({ repository, processor: observer.processor }).runOnce();
   const processed = await repository.findLeadById(observed.lead.id);
   assert.equal(processed.analysisSource, 'ai');
   assert.equal(processed.product, '20l');

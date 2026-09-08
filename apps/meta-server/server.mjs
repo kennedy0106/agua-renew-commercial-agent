@@ -8,13 +8,14 @@ process.on('unhandledRejection', (reason) => { console.error('[servidor] unhandl
 process.on('uncaughtException', (err) => { console.error('[servidor] uncaughtException:', err?.message ?? err); process.exit(1); });
 import { fileURLToPath } from 'node:url';
 
-import { aiConfigurationFromEnvironment, loadEnvironment } from '../../src/config/environment.mjs';
+import { aiConfigurationFromEnvironment, loadEnvironment, validateObserverConfiguration } from '../../src/config/environment.mjs';
 import { PostgresLeadRepository } from '../../src/leads/postgres-lead-repository.mjs';
 import { InMemoryLeadRepository } from '../../src/leads/in-memory-lead-repository.mjs';
 import { ObserverLeadService } from '../../src/leads/observer-lead-service.mjs';
 import { MetaWebhookHandler } from '../../src/meta/meta-webhook-handler.mjs';
 import { ConversationObserver } from '../../src/meta/conversation-observer.mjs';
 import { LeadProcessor } from '../../src/meta/lead-processor.mjs';
+import { AnalysisWorker } from '../../src/meta/analysis-worker.mjs';
 import { LeadsApi } from '../../src/admin/leads-api.mjs';
 import { syncConversations } from '../../src/meta/conversation-sync.mjs';
 import { AdminAuth } from '../../src/admin/admin-auth.mjs';
@@ -26,6 +27,7 @@ import { OpenAICompatibleProvider } from '../../src/ai/deepseek-provider.mjs';
 import { IntakeClassifier } from '../../src/ai/intake-classifier.mjs';
 
 loadEnvironment();
+validateObserverConfiguration();
 
 const appDirectory = fileURLToPath(new URL('.', import.meta.url));
 const publicDirectory = join(appDirectory, 'public');
@@ -33,18 +35,12 @@ const crmPublicDirectory = join(appDirectory, '../crm/dist');
 const port = Number(process.env.PORT ?? process.env.PORT_META ?? 4000);
 const host = process.env.HOST ?? '0.0.0.0';
 const connectionString = process.env.DATABASE_URL;
-const verifyToken = process.env.META_VERIFY_TOKEN ?? 'agua-renew-dev';
+const verifyToken = process.env.META_VERIFY_TOKEN ?? (process.env.NODE_ENV === 'production' ? null : 'agua-renew-dev');
 const appSecret = process.env.META_APP_SECRET ?? null;
 const pageAccessToken = process.env.META_PAGE_ACCESS_TOKEN ?? null;
 const adminToken = process.env.ADMIN_API_TOKEN ?? null;
 const production = process.env.NODE_ENV === 'production';
 const trustProxy = process.env.TRUST_PROXY === 'true';
-if (production && String(adminToken ?? '').length < 32) {
-  throw new Error('En producción ADMIN_API_TOKEN debe tener al menos 32 caracteres.');
-}
-if (production && connectionString && new URL(connectionString).searchParams.get('sslmode') !== 'verify-full') {
-  throw new Error('En producción DATABASE_URL debe configurar sslmode=verify-full.');
-}
 const adminAuth = new AdminAuth({ secret: adminToken, secure: production });
 
 const mimeTypes = {
@@ -147,7 +143,7 @@ function isAuthenticated(request) {
 }
 
 async function verifySchema(pool) {
-  const result = await pool.query("SELECT 1 FROM schema_migrations WHERE filename = '021_lead_ai_analysis.sql'");
+  const result = await pool.query("SELECT 1 FROM schema_migrations WHERE filename = '022_observer_stabilization.sql'");
   if (!result.rowCount) {
     const error = new Error('Esquema desactualizado: ejecute npm run migrate con DATABASE_URL_UNPOOLED.');
     error.code = 'SCHEMA_OUTDATED';
@@ -192,8 +188,11 @@ async function main() {
   }
   const processor = new LeadProcessor({ repository, classifier });
   const observer = new ConversationObserver({ repository, processor });
+  const analysisWorker = new AnalysisWorker({ repository, processor });
+  analysisWorker.runOnce().catch((error) => console.warn('[lead-analysis]', error.message));
+  setInterval(() => analysisWorker.runOnce().catch((error) => console.warn('[lead-analysis]', error.message)), Number(process.env.ANALYSIS_WORKER_INTERVAL_MS ?? 30000)).unref();
   const leadService = new ObserverLeadService({ repository });
-  const webhookHandler = new MetaWebhookHandler({ verifyToken, appSecret, observer, repository, deferProcessing: true });
+  const webhookHandler = new MetaWebhookHandler({ verifyToken, appSecret, requireSignature: production, observer, repository, deferProcessing: true });
   const leadsApi = new LeadsApi({ leadService, repository, adminToken });
   let crmAuth = null;
   let crmRepository = null;

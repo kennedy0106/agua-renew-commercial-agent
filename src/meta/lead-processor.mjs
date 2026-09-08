@@ -126,7 +126,7 @@ export class LeadProcessor {
       confidence = Math.max(confidence, 0.95);
     }
 
-    if (phoneE164 || product || modality) {
+    if ((product || modality) && !NON_LEADS.has(conversationType)) {
       conversationType = 'commercial_lead';
       confidence = Math.max(confidence, 0.8);
     }

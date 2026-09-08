@@ -51,7 +51,7 @@ La aplicación se conecta con `DATABASE_URL`. En Neon use una URL pooled (`-pool
 pnpm migrate
 ```
 
-Las migraciones están en `database/migrations/` (orden `001_…` a `013_…`) y son idempotentes. En producción el servidor verifica el esquema, pero no ejecuta migraciones automáticamente.
+Las migraciones están en `database/migrations/` (actualmente `001_…` a `022_…`) y son idempotentes. En producción el servidor exige `022_observer_stabilization.sql`, pero no ejecuta migraciones automáticamente.
 
 ## CRM comercial
 
@@ -63,7 +63,7 @@ pnpm build:crm
 pnpm start:meta
 ```
 
-Incluye autenticación individual, roles administrador/supervisor/asesor, pipeline, responsables, historial de conversación en solo lectura, tareas, notas, cotizaciones con precios de `CommercialService`, PDF, CSV, reportes, notificaciones y auditoría. Los 835 prospectos históricos quedan referenciados desde contactos y oportunidades; las tablas `leads` y `lead_messages` no se reemplazan.
+`/crm` es el espacio de trabajo autenticado del equipo (pipeline, responsables, tareas, notas, cotizaciones, reportes y auditoría). `/admin` es el panel histórico compatible para observar y corregir leads. Los registros históricos quedan referenciados desde contactos y oportunidades; las tablas `leads` y `lead_messages` no se reemplazan.
 
 ## Iniciar el simulador
 
@@ -145,7 +145,9 @@ pnpm start:meta          # → http://localhost:4000
 pnpm mock:meta "Quiero 20 litros con mi marca, mi número es 955623069"
 ```
 
-Sin `DATABASE_URL` (o si PostgreSQL no responde en desarrollo) usa un repositorio en memoria con advertencia; en producción un fallo de base detiene el arranque. `META_PAGE_ACCESS_TOKEN` se usa solo para consultas GET de Messenger e Instagram. `META_SYNC_ONLY_UNREAD=false` evita perder conversaciones que el Business Agent ya atendió. `ADMIN_API_TOKEN` habilita el login por cookie HttpOnly y en producción es obligatorio (mínimo 32 caracteres).
+En desarrollo, sin `DATABASE_URL` se usa memoria con una advertencia explícita. En producción `DATABASE_URL`, `META_APP_SECRET`, un `META_VERIFY_TOKEN` no predeterminado y `ADMIN_API_TOKEN` (mínimo 32 caracteres) son obligatorios; una base ausente/inaccesible detiene el proceso antes de escuchar. `META_PAGE_ACCESS_TOKEN` se usa solo para consultas GET de Messenger e Instagram.
+
+El análisis es determinístico por defecto. La IA solo se habilita con todas las variables `AI_*`; en producción `AI_BASE_URL` debe pertenecer a `AI_ALLOWED_BASE_URLS`. El observador ignora por completo `DEEPSEEK_*`, reservadas al simulador legacy. Cada mensaje entrante crea o versiona un trabajo en PostgreSQL; el worker recupera pendientes al arrancar, usa leases, hasta cinco intentos con backoff y consulta cada 30 segundos por defecto (`ANALYSIS_WORKER_INTERVAL_MS`).
 
 Para analizar historiales importados sin enviar respuestas:
 
@@ -162,7 +164,7 @@ pnpm backfill:leads:apply  # aplica exactamente el plan revisado
 
 - **Observer estricto**: el runtime no instancia sender, outbox ni proveedor IA; los endpoints salientes responden `META_OBSERVER_READ_ONLY`.
 - **Catálogo alineado al dominio comercial**: productos `20l | 1l | 625ml | 10_5l`; modalidades `maquila | distribution_agua_renew | final_customer`; mapeo a `productId` en `product-catalog-map.mjs`.
-- **Estados**: `NEW → COLLECTING → WAITING_PHONE → READY_FOR_WHATSAPP → CONTACT_OPENED → CONTACTED_MANUALLY → CLOSED`; `control_mode` AUTO/HUMAN/PAUSED; máx. 2 aclaraciones antes de pasar a humano.
+- **Estados y dimensiones**: datos completos producen `READY_FOR_WHATSAPP`; no implican `READY_TO_BUY`. `CONTACT_OPENED` solo registra que se abrió el enlace. `HANDED_OFF` significa que se preparó/derivó el handoff, no que WhatsApp entregó un mensaje. Solo una confirmación humana explícita registra `CONTACTED_MANUALLY`, con actor/fecha y operación idempotente.
 - **Idempotencia**: `external_message_id` único en `lead_messages` + mutex por conversación.
 - **No-leads**: proveedores, spam, soporte y empleo se registran y cierran sin responder.
 

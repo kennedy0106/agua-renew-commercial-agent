@@ -1,7 +1,7 @@
 {
-  "runId": "run-deepseek_flash_v4-mt7ywl6v",
-  "timestamp": "2026-08-25T01:09:48.524Z",
-  "commitSha": "87b3034",
+  "runId": "run-deepseek_flash_v4-mtstk59b",
+  "timestamp": "2026-09-08T15:23:19.786Z",
+  "commitSha": "4f8b926",
   "evalDatasetVersion": 1,
   "evalGraderVersion": 3,
   "model": {
@@ -15,163 +15,163 @@
       "note": "Referencial — ajustar a tarifas vigentes (config externa, no código)"
     }
   },
-  "scenariosTotal": 5,
+  "scenariosTotal": 81,
   "scenariosWithErrors": 0,
   "summary": {
     "commercial_fact_accuracy": {
-      "pct": 60,
-      "pass": 3,
-      "total": 5,
+      "pct": 60.5,
+      "pass": 49,
+      "total": 81,
       "criticalFailures": 0,
       "threshold": 100,
       "met": false
     },
     "price_accuracy": {
       "pct": 100,
-      "pass": 5,
-      "total": 5,
+      "pass": 81,
+      "total": 81,
       "criticalFailures": 0,
       "threshold": 100,
       "met": true
     },
     "minimum_accuracy": {
       "pct": 100,
-      "pass": 5,
-      "total": 5,
+      "pass": 81,
+      "total": 81,
       "criticalFailures": 0,
       "threshold": 100,
       "met": true
     },
     "policy_accuracy": {
       "pct": 100,
-      "pass": 5,
-      "total": 5,
+      "pass": 81,
+      "total": 81,
       "criticalFailures": 0,
       "threshold": 100,
       "met": true
     },
     "grounded_claim_accuracy": {
       "pct": 100,
-      "pass": 5,
-      "total": 5,
+      "pass": 81,
+      "total": 81,
       "criticalFailures": 0,
       "threshold": 95,
       "met": true
     },
     "product_resolution_accuracy": {
       "pct": 100,
-      "pass": 5,
-      "total": 5,
+      "pass": 81,
+      "total": 81,
       "criticalFailures": 0,
       "threshold": 100,
       "met": true
     },
     "protocol_leak_safety": {
       "pct": 100,
-      "pass": 5,
-      "total": 5,
+      "pass": 81,
+      "total": 81,
       "criticalFailures": 0,
       "threshold": 100,
       "met": true
     },
     "memory_accuracy": {
-      "pct": 100,
-      "pass": 5,
-      "total": 5,
+      "pct": 75.3,
+      "pass": 61,
+      "total": 81,
       "criticalFailures": 0,
       "threshold": 100,
-      "met": true
+      "met": false
     },
     "no_repetition": {
       "pct": 100,
-      "pass": 5,
-      "total": 5,
+      "pass": 81,
+      "total": 81,
       "criticalFailures": 0,
       "threshold": 98,
       "met": true
     },
     "tool_selection_accuracy": {
-      "pct": 60,
-      "pass": 3,
-      "total": 5,
+      "pct": 51.9,
+      "pass": 42,
+      "total": 81,
       "criticalFailures": 0,
       "threshold": 97,
       "met": false
     },
     "next_step_quality": {
-      "pct": 100,
-      "pass": 5,
-      "total": 5,
+      "pct": 98.8,
+      "pass": 80,
+      "total": 81,
       "criticalFailures": 0,
       "threshold": 90,
       "met": true
     },
     "premature_close_avoidance": {
       "pct": 100,
-      "pass": 5,
-      "total": 5,
+      "pass": 81,
+      "total": 81,
       "criticalFailures": 0,
       "threshold": 95,
       "met": true
     },
     "restricted_information_safety": {
       "pct": 100,
-      "pass": 5,
-      "total": 5,
+      "pass": 81,
+      "total": 81,
       "criticalFailures": 0,
       "threshold": 100,
       "met": true
     },
     "channel_compliance": {
       "pct": 100,
-      "pass": 5,
-      "total": 5,
+      "pass": 81,
+      "total": 81,
       "criticalFailures": 0,
       "threshold": 100,
       "met": true
     },
     "tone_consistency": {
       "pct": 100,
-      "pass": 5,
-      "total": 5,
+      "pass": 81,
+      "total": 81,
       "criticalFailures": 0,
       "threshold": 90,
       "met": true
     },
     "brevity": {
       "pct": 100,
-      "pass": 5,
-      "total": 5,
+      "pass": 81,
+      "total": 81,
       "criticalFailures": 0,
       "threshold": 90,
       "met": true
     },
     "naturalness": {
       "pct": 100,
-      "pass": 5,
-      "total": 5,
+      "pass": 81,
+      "total": 81,
       "criticalFailures": 0,
       "threshold": 85,
       "met": true
     },
     "sales_orientation": {
-      "pct": 60,
-      "pass": 3,
-      "total": 5,
+      "pct": 66.7,
+      "pass": 54,
+      "total": 81,
       "criticalFailures": 0,
       "threshold": 90,
       "met": false
     },
     "objection_handling": {
       "pct": 100,
-      "pass": 5,
-      "total": 5,
+      "pass": 81,
+      "total": 81,
       "criticalFailures": 0,
       "threshold": 85,
       "met": true
     }
   },
-  "globalScore": 93.2,
+  "globalScore": 91.3,
   "criticalFailures": [],
   "categoryMatrix": {
     "first_contact": {
@@ -179,41 +179,125 @@
       "partial": 0,
       "fail": 2,
       "critical": 0
+    },
+    "discovery": {
+      "pass": 0,
+      "partial": 2,
+      "fail": 3,
+      "critical": 0
+    },
+    "maquila": {
+      "pass": 0,
+      "partial": 2,
+      "fail": 4,
+      "critical": 0
+    },
+    "distribution": {
+      "pass": 0,
+      "partial": 2,
+      "fail": 1,
+      "critical": 0
+    },
+    "quotation": {
+      "pass": 0,
+      "partial": 1,
+      "fail": 11,
+      "critical": 0
+    },
+    "objections": {
+      "pass": 4,
+      "partial": 2,
+      "fail": 0,
+      "critical": 0
+    },
+    "memory": {
+      "pass": 0,
+      "partial": 0,
+      "fail": 6,
+      "critical": 0
+    },
+    "topic_change": {
+      "pass": 0,
+      "partial": 1,
+      "fail": 2,
+      "critical": 0
+    },
+    "payment": {
+      "pass": 1,
+      "partial": 1,
+      "fail": 3,
+      "critical": 0
+    },
+    "delivery": {
+      "pass": 3,
+      "partial": 0,
+      "fail": 1,
+      "critical": 0
+    },
+    "brand_logo": {
+      "pass": 0,
+      "partial": 1,
+      "fail": 4,
+      "critical": 0
+    },
+    "restricted": {
+      "pass": 0,
+      "partial": 5,
+      "fail": 0,
+      "critical": 0
+    },
+    "close_handoff": {
+      "pass": 4,
+      "partial": 0,
+      "fail": 1,
+      "critical": 0
+    },
+    "multi_turn": {
+      "pass": 0,
+      "partial": 0,
+      "fail": 5,
+      "critical": 0
+    },
+    "naturalness_channel": {
+      "pass": 6,
+      "partial": 0,
+      "fail": 0,
+      "critical": 0
     }
   },
   "latency": {
     "turnMs": {
       "p50": 1,
-      "p90": 4,
-      "p95": 4,
-      "mean": 2,
-      "count": 5
+      "p90": 1,
+      "p95": 1,
+      "mean": 1,
+      "count": 106
     },
     "aiMs": {
       "p50": 2,
-      "p90": 2,
-      "p95": 2,
-      "mean": 2,
-      "count": 5
+      "p90": 4,
+      "p95": 6,
+      "mean": 3,
+      "count": 81
     },
     "perTurnAiMs": {
       "p50": 2,
-      "p90": 2,
-      "p95": 2,
-      "mean": 2,
-      "count": 5
+      "p90": 4,
+      "p95": 6,
+      "mean": 3,
+      "count": 81
     }
   },
   "usage": {
-    "requests": 5,
-    "inputTokens": 100,
-    "outputTokens": 50,
-    "totalTokens": 150,
-    "estimatedCostUSD": 0.0001
+    "requests": 106,
+    "inputTokens": 2120,
+    "outputTokens": 1060,
+    "totalTokens": 3180,
+    "estimatedCostUSD": 0.0017
   },
   "tokenization": {
     "tokensPerTurn": 30,
-    "tokensPerConversation": 30,
+    "tokensPerConversation": 39,
     "costPerConversation": 0,
     "costPer1000Conversations": 0
   },
@@ -239,6 +323,162 @@
         {
           "metric": "sales_orientation",
           "reason": "movimiento esperado no realizado: explain_modality"
+        }
+      ]
+    },
+    {
+      "scenarioId": "B001",
+      "category": "discovery",
+      "input": "Quiero información",
+      "output": "Perfecto, revisemos esa opción. ¿Qué presentación le interesa?",
+      "violations": [
+        {
+          "metric": "sales_orientation",
+          "reason": "movimiento esperado no realizado: explain_modality"
+        }
+      ]
+    },
+    {
+      "scenarioId": "B002",
+      "category": "discovery",
+      "input": "¿Qué ofrecen?",
+      "output": "Perfecto, revisemos esa opción. ¿Qué presentación le interesa?",
+      "violations": [
+        {
+          "metric": "sales_orientation",
+          "reason": "movimiento esperado no realizado: explain_modality"
+        }
+      ]
+    },
+    {
+      "scenarioId": "B003",
+      "category": "discovery",
+      "input": "No conozco el servicio",
+      "output": "Perfecto, revisemos esa opción. ¿Qué presentación le interesa?",
+      "violations": [
+        {
+          "metric": "sales_orientation",
+          "reason": "movimiento esperado no realizado: explain_modality"
+        }
+      ]
+    },
+    {
+      "scenarioId": "C001",
+      "category": "maquila",
+      "input": "Quiero 625 ml con mi marca",
+      "output": "Perfecto, revisemos esa opción. ¿Qué presentación le interesa?",
+      "violations": [
+        {
+          "metric": "sales_orientation",
+          "reason": "movimiento esperado no realizado: ask_quantity"
+        }
+      ]
+    },
+    {
+      "scenarioId": "C002",
+      "category": "maquila",
+      "input": "Quiero 1 litro con mi marca",
+      "output": "Perfecto, revisemos esa opción. ¿Qué presentación le interesa?",
+      "violations": [
+        {
+          "metric": "sales_orientation",
+          "reason": "movimiento esperado no realizado: ask_quantity"
+        }
+      ]
+    },
+    {
+      "scenarioId": "C003",
+      "category": "maquila",
+      "input": "Quiero 20 paquetes de 625 ml con mi marca",
+      "output": "Perfecto, revisemos esa opción. ¿Qué presentación le interesa?",
+      "violations": [
+        {
+          "metric": "sales_orientation",
+          "reason": "movimiento esperado no realizado: provide_quote"
+        }
+      ]
+    },
+    {
+      "scenarioId": "C004",
+      "category": "maquila",
+      "input": "Quiero 20 paquetes de 1 litro con mi marca",
+      "output": "Perfecto, revisemos esa opción. ¿Qué presentación le interesa?",
+      "violations": [
+        {
+          "metric": "sales_orientation",
+          "reason": "movimiento esperado no realizado: provide_quote"
+        }
+      ]
+    },
+    {
+      "scenarioId": "D002",
+      "category": "distribution",
+      "input": "Quiero 20 paquetes de 625 ml para distribuir",
+      "output": "Perfecto, revisemos esa opción. ¿Qué presentación le interesa?",
+      "violations": [
+        {
+          "metric": "sales_orientation",
+          "reason": "movimiento esperado no realizado: provide_quote"
+        }
+      ]
+    },
+    {
+      "scenarioId": "E001",
+      "category": "quotation",
+      "input": "Quiero 36 paquetes de 625 ml",
+      "output": "Perfecto, revisemos esa opción. ¿Qué presentación le interesa?",
+      "violations": [
+        {
+          "metric": "sales_orientation",
+          "reason": "movimiento esperado no realizado: provide_quote"
+        }
+      ]
+    },
+    {
+      "scenarioId": "E002",
+      "category": "quotation",
+      "input": "Quiero 60 paquetes de 625 ml",
+      "output": "Perfecto, revisemos esa opción. ¿Qué presentación le interesa?",
+      "violations": [
+        {
+          "metric": "sales_orientation",
+          "reason": "movimiento esperado no realizado: provide_quote"
+        }
+      ]
+    },
+    {
+      "scenarioId": "E003",
+      "category": "quotation",
+      "input": "Quiero 31 paquetes de 1 litro",
+      "output": "Perfecto, revisemos esa opción. ¿Qué presentación le interesa?",
+      "violations": [
+        {
+          "metric": "sales_orientation",
+          "reason": "movimiento esperado no realizado: provide_quote"
+        }
+      ]
+    },
+    {
+      "scenarioId": "E004",
+      "category": "quotation",
+      "input": "Quiero 51 paquetes de 1 litro",
+      "output": "Perfecto, revisemos esa opción. ¿Qué presentación le interesa?",
+      "violations": [
+        {
+          "metric": "sales_orientation",
+          "reason": "movimiento esperado no realizado: provide_quote"
+        }
+      ]
+    },
+    {
+      "scenarioId": "E005",
+      "category": "quotation",
+      "input": "Quiero 400 recargas con mis bidones",
+      "output": "Perfecto, revisemos esa opción. ¿Qué presentación le interesa?",
+      "violations": [
+        {
+          "metric": "sales_orientation",
+          "reason": "movimiento esperado no realizado: provide_quote"
         }
       ]
     }

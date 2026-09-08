@@ -124,17 +124,25 @@ export class CrmInterventionRepository extends CrmRevenueRepository {
     if (!INTENT.has(intentLevel) || !DATA_QUALITY.has(dataQuality)) throw new Error('Clasificación inválida');
     if (product && !PRODUCTS.has(product)) throw new Error('Producto inválido');
     if (modality && !MODALITIES.has(modality)) throw new Error('Modalidad inválida');
-    const current = await this.pool.query(`SELECT o.*,c.phone_e164 FROM crm_opportunities o JOIN crm_contacts c ON c.id=o.contact_id WHERE o.id=$1 AND o.deleted_at IS NULL`,[id]);
-    if (!current.rowCount) throw new Error('Oportunidad no encontrada');
-    if (qualificationStatus==='READY' && (!current.rows[0].phone_e164 || !product || !modality)) throw new Error('Para dejar listo para WhatsApp confirme teléfono, producto y modalidad');
     const priorityScore = Math.min(100,Math.max(0,Number(input.priorityScore)||0));
-    const result = await this.pool.query(`UPDATE crm_opportunities SET product=$3,modality=$4,qualification_status=$5,intent_level=$6,data_quality=$7,
-      priority_score=$8,automation_summary=$9,review_reason=$10,classification_source='HUMAN',classified_at=now(),version=version+1,updated_at=now()
-      WHERE id=$1 AND version=$2 AND deleted_at IS NULL RETURNING id`,
-    [id,Number(version),product,modality,qualificationStatus,intentLevel,dataQuality,priorityScore,clean(input.summary),clean(input.reviewReason)]);
-    if (!result.rowCount) throw conflict('La clasificación cambió en otra sesión');
-    await this.audit({actor,action:'OPPORTUNITY_QUALIFIED',entityType:'opportunity',entityId:id,changes:{qualificationStatus,intentLevel,dataQuality,priorityScore,product,modality},...requestMeta});
-    return this.findOpportunity(id, actor);
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      const current = await client.query(`SELECT o.*,c.phone_e164 FROM crm_opportunities o JOIN crm_contacts c ON c.id=o.contact_id
+        WHERE o.id=$1 AND o.organization_id=$2 AND o.lifecycle_status='OPEN' AND o.deleted_at IS NULL FOR UPDATE OF o`,[id,ORGANIZATION_ID]);
+      if (!current.rowCount) throw new Error('Oportunidad no encontrada');
+      const row = current.rows[0];
+      if (actor.role === 'ADVISOR' && row.owner_id !== actor.id) throw new Error('No autorizado: debe asumir la oportunidad antes de modificarla');
+      if (Number(row.version) !== Number(version)) throw conflict('La clasificación cambió en otra sesión');
+      if (qualificationStatus==='READY' && (!row.phone_e164 || !product || !modality)) throw new Error('Para dejar listo para WhatsApp confirme teléfono, producto y modalidad');
+      await client.query(`UPDATE crm_opportunities SET product=$2,modality=$3,qualification_status=$4,intent_level=$5,data_quality=$6,
+        priority_score=$7,automation_summary=$8,review_reason=$9,classification_source='HUMAN',classified_at=now(),version=version+1,updated_at=now()
+        WHERE id=$1`, [id,product,modality,qualificationStatus,intentLevel,dataQuality,priorityScore,clean(input.summary),clean(input.reviewReason)]);
+      await audit(client,actor,'OPPORTUNITY_QUALIFIED',id,{qualificationStatus,intentLevel,dataQuality,priorityScore,product,modality},requestMeta);
+      await client.query('COMMIT');
+      return this.findOpportunity(id, actor);
+    } catch (error) { await client.query('ROLLBACK'); throw error; }
+    finally { client.release(); }
   }
 
   async prepareWhatsAppHandoff(id, version, { message, consentConfirmed = false } = {}, actor, requestMeta = {}) {

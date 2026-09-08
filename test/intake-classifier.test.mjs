@@ -51,6 +51,19 @@ test('determinístico: botellitas pequeñas no asume 625 ml', () => {
   assert.equal(result.extraction.modality, 'maquila');
 });
 
+test('determinístico: intención prevalece sobre datos extraídos', () => {
+  assert.equal(deterministicClassify('Somos una agencia, podemos manejar sus redes. Llámennos al 955623069').conversationType, 'service_provider');
+  assert.equal(deterministicClassify('Busco empleo, mi teléfono es 955623069').conversationType, 'employment_or_job');
+  assert.equal(deterministicClassify('Tengo un reclamo por un bidón de 20 L').conversationType, 'support_or_complaint');
+  assert.equal(deterministicClassify('Tengo una agencia y quiero botellas con mi logo').conversationType, 'commercial_lead');
+  assert.equal(deterministicClassify('955623069').conversationType, 'unclear');
+});
+
+test('determinístico: 625 exige contexto de presentación y no sale de un teléfono', () => {
+  assert.equal(deterministicClassify('Mi teléfono es 962512345').extraction.product, null);
+  assert.equal(deterministicClassify('Quiero botellas de 625 ml').extraction.product, '625ml');
+});
+
 test('IA: salida JSON estructurada se normaliza y valida', async () => {
   const provider = new FakeAIProvider([{
     conversation_type: 'commercial_lead', confidence: 1.5, reason_code: 'asks_price',
