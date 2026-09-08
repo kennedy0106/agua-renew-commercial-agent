@@ -18,12 +18,17 @@ export async function runMigrations(pool) {
   )`);
   const files = (await readdir(migrationDirectory)).filter((file) => file.endsWith('.sql')).sort();
   for (const filename of files) {
-    const applied = await pool.query('SELECT 1 FROM schema_migrations WHERE filename = $1', [filename]);
-    if (applied.rowCount) continue;
     const sql = await readFile(join(migrationDirectory, filename), 'utf8');
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
+      // Serializa el check y la aplicación cuando dos suites arrancan a la vez.
+      await client.query("SELECT pg_advisory_xact_lock(hashtext('agua_renew_schema_migrations'))");
+      const applied = await client.query('SELECT 1 FROM schema_migrations WHERE filename = $1', [filename]);
+      if (applied.rowCount) {
+        await client.query('COMMIT');
+        continue;
+      }
       await client.query(sql);
       await client.query('INSERT INTO schema_migrations (filename) VALUES ($1)', [filename]);
       await client.query('COMMIT');

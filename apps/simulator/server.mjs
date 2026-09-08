@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { ConversationEngine } from '../../src/conversation/conversation-engine.mjs';
 import { PostgresConversationRepository } from '../../src/repository/postgres-conversation-repository.mjs';
 import { runMigrations } from '../../scripts/migrate.mjs';
-import { DeepSeekProvider } from '../../src/ai/deepseek-provider.mjs';
+import { OpenAICompatibleProvider } from '../../src/ai/deepseek-provider.mjs';
 import { AIInterpreter } from '../../src/ai/ai-interpreter.mjs';
 import { CommercialAgent } from '../../src/ai/commercial-agent.mjs';
 import { CommercialToolRegistry } from '../../src/ai/commercial-tool-registry.mjs';
@@ -100,9 +100,9 @@ async function main() {
   await runMigrations(repository.pool);
   const aiConfig = aiConfigurationFromEnvironment();
   conversationArchitecture = aiConfig.conversationArchitecture;
-  if (aiConfig.enabled && aiConfig.provider === 'deepseek') {
+  if (aiConfig.enabled) {
     const commercialService = new CommercialService();
-    const provider = new DeepSeekProvider(aiConfig.deepseek);
+    const provider = new OpenAICompatibleProvider(aiConfig.compatible);
     aiInterpreter = new AIInterpreter({ provider, commercialService });
     commercialAgent = new CommercialAgent({ provider, tools: new CommercialToolRegistry({ commercialService }) });
   }

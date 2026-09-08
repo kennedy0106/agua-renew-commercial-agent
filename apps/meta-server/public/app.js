@@ -5,8 +5,10 @@ const state = {
   sort: { key: 'createdAt', dir: 'desc' },
   lastListKey: null,
   initialMotion: true,
-  visibleCount: null,
+  page: 1,
   currentLeads: [],
+  totalLeads: 0,
+  totals: { total: 0, missingPhone: 0, ready: 0, contacted: 0 },
 };
 const $ = (id) => document.getElementById(id);
 const isMobile = () => window.matchMedia('(max-width: 980px)').matches;
@@ -15,7 +17,7 @@ const scrollToElement = (element, options = {}) => element?.scrollIntoView({ ...
 const listPageSize = () => window.matchMedia('(max-width: 700px)').matches ? 8 : 12;
 
 function resetListView() {
-  state.visibleCount = listPageSize();
+  state.page = 1;
   state.lastListKey = null;
 }
 
@@ -53,7 +55,7 @@ async function api(path, options = {}) {
 /* ── Etiquetas en español ── */
 const STATUS_LABEL = {
   NEW: 'Nuevo', COLLECTING: 'Capturando', WAITING_PHONE: 'Falta WhatsApp',
-  WAITING_MODALITY: 'Falta modalidad', READY_FOR_WHATSAPP: 'Listo',
+  WAITING_MODALITY: 'Capturando', READY_FOR_WHATSAPP: 'Listo',
   CONTACT_OPENED: 'WhatsApp abierto',
   CONTACTED_MANUALLY: 'Contactado', CLOSED: 'Cerrado',
   WHATSAPP_SMART_LINK_SENT: 'Enlace enviado', WHATSAPP_SEND_FAILED: 'Error de envío',
@@ -70,8 +72,8 @@ const EVENT_LABEL = {
   OUTBOUND_FAILED: 'Entrega fallida', OUTBOUND_UNKNOWN: 'Entrega incierta',
   OUTBOUND_REQUEUED: 'Reintento manual encolado', MODALITY_CAPTURED: 'Modalidad registrada',
   PRODUCT_CAPTURED: 'Producto registrado', PHONE_CAPTURED: 'WhatsApp registrado',
+  LEAD_PROCESSED: 'Conversación procesada', CONTACT_CONFIRMED: 'Contacto confirmado',
 };
-const CONTROL_LABEL = { AUTO: 'Automático', HUMAN: 'Manual' };
 const PRODUCT_LABEL = { '20l': '20 L', '1l': '1 L', '625ml': '625 ml', '10_5l': '10.5 L' };
 const MODALITY_LABEL = { maquila: 'Maquila', distribution_agua_renew: 'Distribución', final_customer: 'Consumo' };
 const CHANNEL_LABEL = { instagram: 'Instagram', facebook_messenger: 'Facebook' };
@@ -113,35 +115,32 @@ async function loadList(animate = false) {
   try {
     const query = new URLSearchParams();
     for (const [key, value] of Object.entries(state.filters)) {
-      if (value) query.set(key, value);
+      if (value) query.set(key === 'type' ? 'conversationType' : key, value);
     }
+    const pageSize = listPageSize();
+    query.set('limit', String(pageSize));
+    query.set('offset', String((state.page - 1) * pageSize));
+    query.set('sort', state.sort.key);
+    query.set('direction', state.sort.dir);
+    if (state.search.trim()) query.set('q', state.search.trim());
     const response = await api(`/api/leads?${query.toString()}`);
     const data = await response.json();
-    let leads = data.leads;
-
-    // Búsqueda client-side por nombre o teléfono.
-    const q = state.search.trim().toLowerCase();
-    const qDigits = q.replace(/\D/g, '');
-    if (q) {
-      leads = leads.filter((l) =>
-        (l.metaUsername ?? '').toLowerCase().includes(q) ||
-        (qDigits && (l.phoneE164 ?? '').replace(/\D/g, '').includes(qDigits)));
-    }
-
-    // Orden client-side.
-    leads = sortLeads(leads, state.sort);
+    const leads = data.leads;
     state.currentLeads = leads;
-    if (state.visibleCount === null) state.visibleCount = listPageSize();
-
+    state.totalLeads = data.totals?.total ?? leads.length;
+    state.totals = data.totals ?? state.totals;
     // Solo re-render si el contenido cambió (evita reiniciar animaciones cada 15s).
-    const key = JSON.stringify(leads.map((l) => [l.id, l.status, l.phoneE164, l.updatedAt ?? l.createdAt]));
+    const key = JSON.stringify(leads.map((l) => [
+      l.id, l.metaUsername, l.status, l.phoneE164, l.product, l.modality,
+      l.conversationType, l.sourceChannel, l.updatedAt ?? l.createdAt,
+    ]));
     if (key !== state.lastListKey) {
       state.lastListKey = key;
-      renderStats(leads, state.initialMotion);
+      renderStats(state.totals, state.initialMotion);
       renderTable(leads, state.initialMotion);
       state.initialMotion = false;
     } else {
-      updateListSummary(leads);
+      updateListSummary(leads, state.totalLeads);
     }
     errorBox.hidden = true;
     errorBox.innerHTML = '';
@@ -196,11 +195,11 @@ function animateStatValue(element, target) {
   requestAnimationFrame(tick);
 }
 
-function renderStats(leads, animate = false) {
-  const total = leads.length;
-  const missingPhone = leads.filter((l) => !l.phoneE164).length;
-  const ready = leads.filter((l) => l.status === 'READY_FOR_WHATSAPP').length;
-  const contacted = leads.filter((l) => ['CONTACTED_MANUALLY', 'CONTACT_OPENED'].includes(l.status)).length;
+function renderStats(totals, animate = false) {
+  const total = totals.total ?? 0;
+  const missingPhone = totals.missingPhone ?? 0;
+  const ready = totals.ready ?? 0;
+  const contacted = totals.contacted ?? 0;
   const pending = total - contacted;
   $('stats').innerHTML = `
     <div class="stat ${animate ? 'stat-in' : ''} s-blue"><span class="stat-accent"></span><span class="stat-symbol" aria-hidden="true">${I('users')}</span><span class="stat-value" data-count="${total}">${animate ? 0 : total}</span><span class="stat-label">Leads totales</span><span class="stat-foot">${pending} por atender</span></div>
@@ -210,37 +209,71 @@ function renderStats(leads, animate = false) {
   if (animate) $('stats').querySelectorAll('[data-count]').forEach((element) => animateStatValue(element, Number(element.dataset.count)));
 }
 
-function updateListSummary(leads) {
-  const shown = Math.min(state.visibleCount ?? leads.length, leads.length);
-  const noun = leads.length === 1 ? 'prospecto' : 'prospectos';
-  $('list-sub').textContent = leads.length ? `Mostrando ${shown} de ${leads.length} ${noun}` : '';
-  const remaining = Math.max(0, leads.length - shown);
+function pageItems(current, total) {
+  if (total <= 5) return Array.from({ length: total }, (_, index) => index + 1);
+  const pages = [...new Set([1, current - 1, current, current + 1, total])]
+    .filter((page) => page >= 1 && page <= total)
+    .sort((a, b) => a - b);
+  const items = [];
+  pages.forEach((page, index) => {
+    if (index && page - pages[index - 1] > 1) items.push('ellipsis');
+    items.push(page);
+  });
+  return items;
+}
+
+function updateListSummary(leads, total = state.totalLeads) {
+  const size = listPageSize();
+  const totalPages = Math.max(1, Math.ceil(total / size));
+  state.page = Math.min(Math.max(1, state.page), totalPages);
+  const first = total ? ((state.page - 1) * size) + 1 : 0;
+  const last = Math.min(((state.page - 1) * size) + leads.length, total);
+  const noun = total === 1 ? 'prospecto' : 'prospectos';
+  $('list-sub').textContent = total ? `${total} ${noun} · Página ${state.page} de ${totalPages}` : '';
+  $('list-progress').textContent = total ? `Mostrando ${first}–${last} de ${total}` : '';
+
   const footer = $('list-footer');
-  footer.hidden = remaining === 0;
-  $('list-progress').textContent = remaining ? `${remaining} ${remaining === 1 ? 'prospecto pendiente' : 'prospectos pendientes'}` : '';
-  $('load-more').textContent = remaining ? `Cargar ${Math.min(listPageSize(), remaining)} más` : 'Todos cargados';
+  const controls = $('pagination-controls');
+  footer.hidden = total === 0;
+  controls.hidden = totalPages <= 1;
+  $('page-prev').disabled = state.page === 1;
+  $('page-next').disabled = state.page === totalPages;
+  $('page-numbers').innerHTML = pageItems(state.page, totalPages).map((item, index) => item === 'ellipsis'
+    ? `<span class="page-ellipsis" aria-hidden="true" data-key="ellipsis-${index}">…</span>`
+    : `<button type="button" class="page-number" data-page="${item}" ${item === state.page ? 'aria-current="page"' : ''} aria-label="Ir a la página ${item}">${item}</button>`).join('');
+}
+
+function leadActivity(createdAt) {
+  const date = new Date(createdAt);
+  const exact = date.toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' });
+  const today = new Date();
+  const startToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const startDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const days = Math.max(0, Math.round((startToday - startDate) / 86400000));
+  const relative = days === 0 ? 'Hoy' : days === 1 ? 'Ayer' : `Hace ${days} días`;
+  return { exact, relative };
 }
 
 function renderTable(leads, animate) {
   const tbody = $('leads-table').querySelector('tbody');
   if (!leads.length) {
     tbody.innerHTML = `<tr><td colspan="5" class="empty">${I('inbox')}<div>${state.search ? 'Sin resultados para la búsqueda.' : 'Sin prospectos con estos filtros.<br>Los mensajes nuevos aparecerán aquí al sincronizar.'}</div></td></tr>`;
-    updateListSummary(leads);
+    updateListSummary(leads, state.totalLeads);
     return;
   }
-  const visibleLeads = leads.slice(0, state.visibleCount ?? listPageSize());
-  tbody.innerHTML = visibleLeads.map((lead, idx) => {
-    const date = new Date(lead.createdAt).toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit' });
+  const size = listPageSize();
+  tbody.innerHTML = leads.map((lead, idx) => {
+    const activity = leadActivity(lead.createdAt);
     const phone = maskPhone(lead.phoneE164);
-    const blocked = lead.metaConfirmationBlocked ? ` <span class="chip blocked" aria-label="Ventana de Meta vencida hace 24 horas">${I('alert')} <span aria-hidden="true">24h</span></span>` : '';
     const name = lead.metaUsername || `Prospecto de ${CHANNEL_LABEL[lead.sourceChannel] ?? 'Meta'}`;
     const isSelected = $('detail').dataset.leadId === lead.id;
     const rowClasses = [isSelected ? 'row-selected' : '', animate ? 'row-enter' : ''].filter(Boolean).join(' ');
     const rowDelay = animate ? ` style="--row-delay:${Math.min(idx * 24, 168)}ms"` : '';
     const channelClass = lead.sourceChannel === 'instagram' ? 'instagram' : 'facebook';
-    const product = PRODUCT_LABEL[lead.product] ?? 'Sin interés definido';
-    const modality = MODALITY_LABEL[lead.modality] ?? '';
+    const product = PRODUCT_LABEL[lead.product] ?? 'Pendiente';
+    const modality = MODALITY_LABEL[lead.modality] ?? 'Pendiente';
     const type = lead.conversationType && lead.conversationType !== 'commercial_lead' ? (TYPE_LABEL[lead.conversationType] ?? lead.conversationType) : '';
+    const completed = [lead.phoneE164, lead.product, lead.modality].filter(Boolean).length;
     const phoneNote = phone
       ? `<span class="progress-note contact-ready">${I('whatsapp')}<span>${phone}</span></span>`
       : (lead.status === 'WAITING_PHONE' ? '' : `<span class="progress-note contact-missing">${I('whatsapp')}<span>Sin número</span></span>`);
@@ -248,16 +281,16 @@ function renderTable(leads, animate) {
     const channelIcon = lead.sourceChannel === 'instagram' ? 'instagram' : 'facebook';
     return `<tr${rowDelay}${rowClasses ? ` class="${rowClasses}"` : ''}>
       <td data-label="Prospecto"><span class="lead-person"><span class="lead-avatar ${channelClass}" aria-hidden="true">${escapeHtml(leadInitials(name))}</span><span class="lead-person-copy"><strong>${escapeHtml(name)}</strong><span class="lead-meta channel-meta ${channelClass}">${I(channelIcon, 'channel-icon')}<span>${escapeHtml(channelLabel)}</span></span></span></span></td>
-      <td data-label="Entrada"><time class="lead-date" datetime="${escapeHtml(lead.createdAt)}">${date}</time></td>
-      <td data-label="Oportunidad" class="${lead.product || lead.modality || type ? '' : 'is-empty'}"><span class="interest-stack"><strong>${product}</strong>${modality ? `<span>${modality}</span>` : ''}${type ? `<span class="lead-type">${type}</span>` : ''}</span></td>
-      <td data-label="Avance"><span class="progress-stack">${statusBadge(lead.status)}${phoneNote}${blocked}</span></td>
+      <td data-label="Ingreso"><span class="activity-stack"><strong>${activity.relative}</strong><time class="lead-date" datetime="${escapeHtml(lead.createdAt)}">${activity.exact}</time></span></td>
+      <td data-label="Datos comerciales"><span class="commercial-stack"><span class="commercial-field ${lead.product ? 'complete' : 'missing'}"><span>Producto</span><strong>${escapeHtml(product)}</strong></span><span class="commercial-field ${lead.modality ? 'complete' : 'missing'}"><span>Modalidad</span><strong>${escapeHtml(modality)}</strong></span>${type ? `<span class="lead-type">${escapeHtml(type)}</span>` : ''}</span></td>
+      <td data-label="Avance"><span class="progress-stack">${statusBadge(lead.status)}<span class="completion-line" aria-label="${completed} de 3 datos requeridos completos"><span class="completion-segments" aria-hidden="true">${[1, 2, 3].map((step) => `<i class="${step <= completed ? 'complete' : ''}"></i>`).join('')}</span><span>${completed}/3 datos</span></span>${phoneNote}</span></td>
       <td data-label="Acciones"><div class="actions-cell">
         ${['READY_FOR_WHATSAPP', 'CONTACT_OPENED'].includes(lead.status) ? `<a class="btn small primary row-whatsapp has-tooltip" href="/api/leads/${lead.id}" data-open="${lead.id}" data-tooltip="Abrir WhatsApp" aria-label="Abrir WhatsApp de ${escapeHtml(name)}">${I('whatsapp')} <span>WhatsApp</span></a>` : ''}
         <button class="btn small ghost row-detail has-tooltip" data-detail="${lead.id}" data-tooltip="Abrir conversación" aria-label="Abrir conversación de ${escapeHtml(name)}">${I('eye')} <span>Abrir</span></button>
       </div></td>
     </tr>`;
   }).join('');
-  updateListSummary(leads);
+  updateListSummary(leads, state.totalLeads);
 }
 
 async function openWhatsApp(id) {
@@ -274,46 +307,6 @@ async function markContacted(id) {
   toast('Marcado como contactado', 'ok');
   loadList();
   showDetail(id);
-}
-
-/* ── Funnel: pedir WhatsApp y responder ── */
-async function requestWhatsapp(id) {
-  try {
-    const response = await api(`/api/leads/${id}/request-whatsapp`, { method: 'POST', body: {} });
-    await response.json();
-    toast('Solicitud encolada para envío', 'ok');
-    showDetail(id);
-  } catch (error) {
-    toast(error.message, 'err');
-  }
-}
-
-async function sendMessage(id) {
-  const input = $('composer-input');
-  const text = (input?.value ?? '').trim();
-  if (!text) return;
-  input.value = '';
-  try {
-    const response = await api(`/api/leads/${id}/send-message`, { method: 'POST', body: { text } });
-    await response.json();
-    toast('Mensaje encolado', 'ok');
-    showDetail(id);
-  } catch (error) {
-    toast(error.message, 'err');
-    input.value = text;
-  }
-}
-
-/* Inserta la burbuja saliente sin recargar todo el chat. */
-function appendOutbound(id, text) {
-  const thread = document.querySelector('.chat-thread');
-  if (!thread) return;
-  const time = new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
-  const div = document.createElement('div');
-  div.className = 'msg outbound';
-  div.innerHTML = `<div class="bubble">${escapeHtml(text)}<div class="meta">${I('send')} ${time}</div></div>`;
-  thread.appendChild(div);
-  thread.scrollTop = thread.scrollHeight;
 }
 
 /* ── Panel de conversación ── */
@@ -343,7 +336,7 @@ function chatThread(messages) {
   let lastDay = null;
   let out = '';
   messages.forEach((m) => {
-    const d = new Date(m.createdAt);
+    const d = new Date(m.sourceCreatedAt ?? m.createdAt);
     const day = dayLabel(d);
     if (day !== lastDay) { out += `<div class="day-divider">${day}</div>`; lastDay = day; }
     const time = d.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
@@ -352,14 +345,9 @@ function chatThread(messages) {
         <div class="bubble">${escapeHtml(m.content)}<div class="meta">${I('clock')} ${time}</div></div>
       </div>`;
     } else {
-      const delivery = {
-        PENDING: 'Pendiente', SENDING: 'Enviando', RETRY_WAIT: 'Reintentando',
-        SENT: 'Enviado', FAILED: 'Falló', UNKNOWN: 'Entrega incierta',
-      }[m.deliveryStatus] ?? 'Enviado';
-      const retry = ['FAILED', 'UNKNOWN'].includes(m.deliveryStatus)
-        ? `<button class="msg-retry" data-retry-message="${m.id}" data-retry-lead="${m.leadId}">Reintentar</button>` : '';
+      const author = m.actorType === 'meta_business_agent' ? 'Meta Business Agent' : 'Página de Meta';
       out += `<div class="msg outbound">
-        <div class="bubble">${escapeHtml(m.content)}<div class="meta">${I('send')} ${time} · ${delivery} ${retry}</div></div>
+        <div class="bubble">${escapeHtml(m.content)}<div class="meta">${I('radio')} ${author} · ${time}</div></div>
       </div>`;
     }
   });
@@ -379,7 +367,7 @@ async function showDetail(id) {
   $('workspace').classList.add('open');
   const name = lead.metaUsername || `Prospecto de ${CHANNEL_LABEL[lead.sourceChannel] ?? 'Meta'}`;
   el.setAttribute('aria-label', `Conversación con ${name}`);
-  const phone = lead.phoneE164 ? escapeHtml(maskPhone(lead.phoneE164)) : '<span class="chip phone missing">sin número</span>';
+  const requiredField = (value, label) => `<span class="required-field ${value ? 'complete' : 'missing'}">${I(value ? 'check' : 'clock')}<span>${escapeHtml(value ? label : 'Faltante')}</span></span>`;
   const events = data.events.map((e) => {
     const t = new Date(e.createdAt).toLocaleString('es-PE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
     return `<li><span>${escapeHtml(evLabel(e.eventType))}</span><span class="ev-time">${t}</span></li>`;
@@ -389,43 +377,41 @@ async function showDetail(id) {
   // Jerarquía: la acción que avanza el funnel es primaria; el resto, secundaria.
   const primary = isReady
     ? `<a class="btn small primary panel-primary-action" href="/api/leads/${lead.id}" data-open="${lead.id}">${I('whatsapp')} Abrir WhatsApp</a>`
-    : (lead.phoneE164 ? '' : `<button class="btn small primary panel-primary-action" data-request-whatsapp="${lead.id}">${I('whatsapp')} Pedir WhatsApp</button>`);
-  const seg = (mode, label) => `<button class="seg-btn ${lead.controlMode === mode ? 'active' : ''}" data-control="${lead.id}" data-mode="${mode}" title="${mode === 'HUMAN' ? 'Pausar el seguimiento automático' : 'Devolver al flujo automático'}">${label}</button>`;
+    : `<span class="read-only-note">Complete teléfono, producto y modalidad para habilitar WhatsApp</span>`;
   const actions = `
     ${primary}
-    ${canContact ? `<button class="btn small green" data-contact="${lead.id}">${I('check')} Contactado</button>` : ''}
-    <div class="seg" role="group" aria-label="Modo de control del lead">${seg('HUMAN', 'Manual')}${seg('AUTO', 'Automático')}</div>`;
+    ${canContact ? `<button class="btn small green" data-contact="${lead.id}">${I('check')} Marcar como contactado</button>` : ''}`;
   el.innerHTML = `
     <div class="panel-head">
       <div class="avatar">${initialOf(name)}</div>
       <div class="who">
         <strong>${escapeHtml(name)}</strong>
-        <small>${CHANNEL_LABEL[lead.sourceChannel] ?? lead.sourceChannel} · ${STATUS_LABEL[lead.status] ?? lead.status} · ${CONTROL_LABEL[lead.controlMode] ?? lead.controlMode}</small>
+        <small>${CHANNEL_LABEL[lead.sourceChannel] ?? lead.sourceChannel} · ${STATUS_LABEL[lead.status] ?? lead.status} · Solo lectura</small>
       </div>
       <button class="close-btn" id="detail-close" aria-label="Cerrar conversación">${I('x')}</button>
     </div>
     <div class="panel-actions">${actions}</div>
     <div class="chat-thread" aria-label="Mensajes de la conversación">${chatThread(data.messages)}</div>
-    <div class="composer">
-      <input id="composer-input" placeholder="Responder por Messenger…" aria-label="Escribir respuesta para enviar por Messenger">
-      <button class="btn primary" id="composer-send" aria-label="Enviar mensaje">${I('send')} <span class="btn-label">Enviar</span></button>
-    </div>
     <details class="panel-info">
       <summary>${I('users')} Ficha del lead <span class="chev">${I('chevron')}</span></summary>
       <div class="info-reveal">
         <div class="info-body">
           <dl class="kv">
             <dt>Estado</dt><dd>${statusBadge(lead.status)}</dd>
-            <dt>Control</dt><dd>${CONTROL_LABEL[lead.controlMode] ?? lead.controlMode}</dd>
-            <dt>WhatsApp</dt><dd>${phone}</dd>
-            <dt>Producto</dt><dd>${PRODUCT_LABEL[lead.product] ?? '—'}</dd>
-            <dt>Modalidad</dt><dd>${MODALITY_LABEL[lead.modality] ?? '—'}</dd>
+            <dt>WhatsApp</dt><dd>${requiredField(lead.phoneE164, maskPhone(lead.phoneE164))}</dd>
+            <dt>Producto</dt><dd>${requiredField(lead.product, PRODUCT_LABEL[lead.product])}</dd>
+            <dt>Modalidad</dt><dd>${requiredField(lead.modality, MODALITY_LABEL[lead.modality])}</dd>
             <dt>Origen</dt><dd>${escapeHtml(ORIGIN_LABEL[lead.sourceOrigin] ?? 'Meta')}</dd>
             <dt>Confianza</dt><dd>${lead.classificationConfidence == null ? '—' : `${Math.round(Number(lead.classificationConfidence) * 100)}%`}</dd>
           </dl>
           <div class="phone-edit-row">
             <input id="phone-edit" placeholder="Corregir teléfono" aria-label="Corregir teléfono del prospecto">
             <button class="btn small primary" data-phone="${lead.id}">Guardar</button>
+          </div>
+          <div class="lead-fields-editor" aria-label="Completar datos del lead">
+            <label>Producto<select id="product-edit"><option value="">Seleccionar…</option><option value="20l" ${lead.product === '20l' ? 'selected' : ''}>Bidón 20 L</option><option value="1l" ${lead.product === '1l' ? 'selected' : ''}>Botella 1 L</option><option value="625ml" ${lead.product === '625ml' ? 'selected' : ''}>Botella 625 ml</option></select></label>
+            <label>Modalidad<select id="modality-edit"><option value="">Seleccionar…</option><option value="maquila" ${lead.modality === 'maquila' ? 'selected' : ''}>Marca propia / Maquila</option><option value="distribution_agua_renew" ${lead.modality === 'distribution_agua_renew' ? 'selected' : ''}>Agua ReNew / Distribución</option></select></label>
+            <button class="btn small primary" data-fields="${lead.id}">Guardar datos</button>
           </div>
           <h4 class="events-title">Eventos</h4>
           <ul class="events-list">${events || '<li>Sin eventos</li>'}</ul>
@@ -439,10 +425,6 @@ async function showDetail(id) {
   $('detail-close').addEventListener('click', () => {
     renderPanelEmpty();
     if (isMobile()) scrollToElement(document.querySelector('.table-card'));
-  });
-  $('composer-send').addEventListener('click', () => sendMessage(id));
-  $('composer-input').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(id); }
   });
   state.lastListKey = null; // refresca la fila seleccionada antes de posicionar el panel
   await loadList(false);
@@ -547,16 +529,6 @@ async function syncNow() {
   }
 }
 
-async function loadAutoReply() {
-  const response = await api('/api/leads/autoreply');
-  const data = await response.json();
-  const on = Boolean(data.autoReplyEnabled);
-  const dot = $('autoreply-state');
-  dot.classList.toggle('on', on);
-  $('autoreply-toggle').setAttribute('aria-pressed', String(on));
-  $('autoreply-toggle').title = on ? 'Desactivar respuesta automática' : 'Activar respuesta automática';
-}
-
 function setSyncPill(h) {
   const dot = $('sync-dot');
   const text = $('sync-text');
@@ -577,9 +549,7 @@ async function loadHealth() {
     const response = await api('/api/admin/health');
     const h = await response.json();
     const db = h.repository === 'postgres' ? 'Datos conectados' : 'Sesión de prueba';
-    const sender = h.sender === 'live' ? 'Mensajería conectada' : 'Mensajería de prueba';
-    const ai = h.ai === 'deepseek' ? 'Asistencia inteligente' : 'Clasificación estándar';
-    $('foot-status').textContent = `Sistema operativo · ${db} · ${sender} · ${ai}`;
+    $('foot-status').textContent = `Sistema operativo · ${db} · Observer Meta · Procesamiento determinístico`;
     $('foot-sync').textContent = h.autoSync ? `Sincronización automática activa` : 'Sincronización automática desactivada';
     setSyncPill(h);
   } catch {
@@ -596,20 +566,15 @@ $('logout').addEventListener('click', async () => {
   location.replace('/login');
 });
 $('sync').addEventListener('click', syncNow);
-$('autoreply-toggle').addEventListener('click', async () => {
-  const current = $('autoreply-state').classList.contains('on');
-  await api('/api/leads/autoreply', { method: 'POST', body: { enabled: !current } });
-  loadAutoReply();
-  toast(current ? 'Respuesta automática desactivada' : 'Respuesta automática activada', 'ok');
-});
 $('export-csv').addEventListener('click', () => exportFile('export.csv'));
 $('export-xlsx').addEventListener('click', () => exportFile('export.xlsx'));
 
 async function exportFile(kind) {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(state.filters)) {
-    if (value) query.set(key, value);
+    if (value) query.set(key === 'type' ? 'conversationType' : key, value);
   }
+  if (state.search.trim()) query.set('q', state.search.trim());
   const response = await api(`/api/leads/${kind}?${query.toString()}`);
   const blob = await response.blob();
   const link = document.createElement('a');
@@ -622,28 +587,12 @@ async function exportFile(kind) {
 }
 
 document.addEventListener('click', async (event) => {
-  const retryMessage = event.target.closest('[data-retry-message]');
-  if (retryMessage) {
-    await api(`/api/leads/${retryMessage.dataset.retryLead}/messages/${retryMessage.dataset.retryMessage}/retry`, { method: 'POST', body: {} });
-    toast('Mensaje reenviado a la cola', 'ok');
-    showDetail(retryMessage.dataset.retryLead);
-    return;
-  }
   const open = event.target.closest('[data-open]');
   if (open) { event.preventDefault(); await openWhatsApp(open.dataset.open); return; }
   const contact = event.target.closest('[data-contact]');
   if (contact) { await markContacted(contact.dataset.contact); return; }
-  const reqWa = event.target.closest('[data-request-whatsapp]');
-  if (reqWa) { await requestWhatsapp(reqWa.dataset.requestWhatsapp); return; }
   const detail = event.target.closest('[data-detail]');
   if (detail) { await showDetail(detail.dataset.detail); return; }
-  const control = event.target.closest('[data-control]');
-  if (control) {
-    await api(`/api/leads/${control.dataset.control}/control`, { method: 'POST', body: { controlMode: control.dataset.mode } });
-    toast(control.dataset.mode === 'HUMAN' ? 'Control manual tomado' : 'De vuelta a automático', 'ok');
-    loadList(); showDetail(control.dataset.control);
-    return;
-  }
   const close = event.target.closest('[data-close]');
   if (close) { await closeLead(close.dataset.close, close); return; }
   const del = event.target.closest('[data-delete]');
@@ -655,6 +604,16 @@ document.addEventListener('click', async (event) => {
     await api(`/api/leads/${phone.dataset.phone}/phone`, { method: 'POST', body: { phone: value } });
     toast('Teléfono guardado', 'ok');
     loadList(); showDetail(phone.dataset.phone);
+    return;
+  }
+  const fields = event.target.closest('[data-fields]');
+  if (fields) {
+    const product = $('product-edit').value;
+    const modality = $('modality-edit').value;
+    if (!product || !modality) { toast('Seleccione producto y modalidad', 'err'); return; }
+    await api(`/api/leads/${fields.dataset.fields}/edit`, { method: 'POST', body: { product, modality } });
+    toast('Datos del lead guardados', 'ok');
+    loadList(); showDetail(fields.dataset.fields);
   }
 });
 
@@ -695,9 +654,24 @@ function syncSortTabStops() {
 mobileSortMedia.addEventListener('change', syncSortTabStops);
 syncSortTabStops();
 
-$('load-more').addEventListener('click', () => {
-  state.visibleCount += listPageSize();
-  renderTable(state.currentLeads, false);
+function changePage(page) {
+  const totalPages = Math.max(1, Math.ceil(state.totalLeads / listPageSize()));
+  state.page = Math.min(Math.max(1, page), totalPages);
+  state.lastListKey = null;
+  loadList(false);
+  scrollToElement(document.querySelector('.table-card'), { block: 'start' });
+}
+
+$('page-prev').addEventListener('click', () => changePage(state.page - 1));
+$('page-next').addEventListener('click', () => changePage(state.page + 1));
+$('page-numbers').addEventListener('click', (event) => {
+  const button = event.target.closest('[data-page]');
+  if (button) changePage(Number(button.dataset.page));
+});
+mobileSortMedia.addEventListener('change', () => {
+  state.page = 1;
+  state.lastListKey = null;
+  loadList(false);
 });
 
 /* ESC cierra la conversación (sin tocar inputs). */
@@ -870,7 +844,6 @@ document.querySelectorAll('.sidebar-nav a').forEach((link) => link.addEventListe
 renderLoadingState();
 renderPanelEmpty();
 loadList(true);
-loadAutoReply().catch(() => {});
 loadHealth();
 setInterval(() => loadList(false), 15_000);
 setInterval(loadHealth, 30_000);

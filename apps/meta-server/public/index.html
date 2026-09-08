@@ -116,11 +116,9 @@
       <section id="stats" class="stats" aria-label="Indicadores de prospectos"></section>
 
       <section class="control-deck" aria-label="Controles del panel">
-        <div class="control-copy"><strong>Operación comercial</strong><span>Administra automatización y archivos</span></div>
+        <div class="control-copy"><strong>Operación comercial</strong><span>Meta Business Agent atiende · Panel en modo observación</span></div>
         <div class="header-actions">
-          <button id="autoreply-toggle" class="btn toggle" title="Activar o desactivar la respuesta automática" aria-pressed="false">
-            <svg class="icon"><use href="#i-radio"/></svg><span class="btn-label">Auto-respuesta</span><span id="autoreply-state" class="state-dot off"></span>
-          </button>
+          <span class="observer-pill" role="status"><svg class="icon"><use href="#i-eye"/></svg> Solo lectura en Meta</span>
           <button id="export-csv" class="btn" title="Exportar CSV"><svg class="icon"><use href="#i-download"/></svg><span class="btn-label">CSV</span></button>
           <button id="export-xlsx" class="btn" title="Exportar Excel"><svg class="icon"><use href="#i-download"/></svg><span class="btn-label">Excel</span></button>
           <button id="refresh" class="btn ghost" title="Actualizar lista" aria-label="Actualizar lista"><svg class="icon"><use href="#i-refresh"/></svg></button>
@@ -172,15 +170,22 @@
               <colgroup><col class="col-prospect"><col class="col-entry"><col class="col-opportunity"><col class="col-progress"><col class="col-actions"></colgroup>
               <thead><tr>
                 <th class="sortable" data-sort="metaUsername"><button class="sort-button" type="button">Prospecto<span class="sort-arrow"></span></button></th>
-                <th class="sortable" data-sort="createdAt" aria-sort="descending"><button class="sort-button" type="button">Entrada<span class="sort-arrow">↓</span></button></th>
-                <th class="sortable" data-sort="product"><button class="sort-button" type="button">Oportunidad<span class="sort-arrow"></span></button></th>
+                <th class="sortable" data-sort="createdAt" aria-sort="descending"><button class="sort-button" type="button">Ingreso<span class="sort-arrow">↓</span></button></th>
+                <th class="sortable" data-sort="product"><button class="sort-button" type="button">Datos comerciales<span class="sort-arrow"></span></button></th>
                 <th class="sortable" data-sort="status"><button class="sort-button" type="button">Avance<span class="sort-arrow"></span></button></th>
                 <th class="th-actions">Acciones</th>
               </tr></thead>
               <tbody></tbody>
             </table>
           </div>
-          <div id="list-footer" class="list-footer" hidden><span id="list-progress"></span><button id="load-more" class="btn small" type="button">Cargar más prospectos</button></div>
+          <nav id="list-footer" class="list-footer" aria-label="Paginación de prospectos" hidden>
+            <span id="list-progress" aria-live="polite"></span>
+            <div id="pagination-controls" class="pagination-controls" role="group" aria-label="Cambiar página">
+              <button id="page-prev" class="page-step" type="button">Anterior</button>
+              <div id="page-numbers" class="page-numbers"></div>
+              <button id="page-next" class="page-step" type="button">Siguiente</button>
+            </div>
+          </nav>
         </section>
         <section id="detail" class="card chat-panel" role="region" aria-label="Conversación del prospecto"></section>
       </div>
@@ -207,6 +212,6 @@
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <div id="action-tooltip" class="action-tooltip" role="tooltip" hidden></div>
-  <script src="/admin/app.js?v=20260901-chat-panel"></script>
+  <script src="/admin/app.js?v=20260901-pagination"></script>
 </body>
 </html>

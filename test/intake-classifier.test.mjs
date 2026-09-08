@@ -32,6 +32,18 @@ test('determinístico: spam no entra al flujo', () => {
   assert.equal(result.conversationType, 'spam_or_irrelevant');
 });
 
+test('determinístico: una automatización de alquiler de vehículos se archiva como contexto ajeno', () => {
+  const result = deterministicClassify('Servicio de alquiler de vehículos: minivan o camión de 5 toneladas');
+  assert.equal(result.conversationType, 'spam_or_irrelevant');
+  assert.equal(result.reasonCode, 'foreign_business_context');
+});
+
+test('determinístico: una consulta de agua que menciona reparto no se considera contexto ajeno', () => {
+  const result = deterministicClassify('Necesito bidones de agua para repartir en camión');
+  assert.equal(result.conversationType, 'commercial_lead');
+  assert.equal(result.extraction.product, '20l');
+});
+
 test('determinístico: botellitas pequeñas no asume 625 ml', () => {
   const result = deterministicClassify('quiero poner mi logo en las botellitas pequeñas');
   assert.equal(result.conversationType, 'commercial_lead');
@@ -44,6 +56,8 @@ test('IA: salida JSON estructurada se normaliza y valida', async () => {
     conversation_type: 'commercial_lead', confidence: 1.5, reason_code: 'asks_price',
     offering_services_to_renew: false,
     extraction: { phone: '955 623 069', product: '999l', modality: 'maquila' },
+    summary: 'Solicita una cotización de maquila.',
+    whatsapp_draft: 'Hola. Revisé su consulta de maquila. ¿Confirmamos la presentación?',
   }]);
   const classifier = new IntakeClassifier({ provider });
   const result = await classifier.classify({ text: 'cuánto cuesta' });
@@ -52,6 +66,9 @@ test('IA: salida JSON estructurada se normaliza y valida', async () => {
   assert.equal(result.extraction.phone, '+51955623069'); // normalizado
   assert.equal(result.extraction.product, null); // valor no canónico descartado
   assert.equal(result.extraction.modality, 'maquila');
+  assert.equal(result.analysisSource, 'ai');
+  assert.equal(result.summary, 'Solicita una cotización de maquila.');
+  assert.match(result.suggestedWhatsappMessage, /consulta de maquila/);
 });
 
 test('IA: si falla, cae al clasificador determinístico (fallback conservador)', async () => {
@@ -60,6 +77,7 @@ test('IA: si falla, cae al clasificador determinístico (fallback conservador)',
   const result = await classifier.classify({ text: 'quiero vender agua con mi marca' });
   assert.equal(result.conversationType, 'commercial_lead');
   assert.equal(result.extraction.modality, 'maquila');
+  assert.equal(result.analysisSource, 'deterministic_fallback');
 });
 
 test('IA: conversación_type no válido se reemplaza por unclear', async () => {

@@ -1,13 +1,13 @@
 # Automatización comercial Agua ReNew
 
-Simulador local de atención comercial para Agua ReNew con persistencia en PostgreSQL e IA opcional (DeepSeek).
+Sistema de captación de leads para Agua ReNew. El runtime productivo observa las conversaciones atendidas por Meta Business Agent, procesa datos de forma determinística y prepara el handoff humano a WhatsApp.
 
 ```text
 UI local → ConversationEngine → Repository → PostgreSQL
                          └→ CommercialService → knowledge/agua_renew_commercial_data.json
 ```
 
-No integra WhatsApp, n8n, OVH ni otros servicios externos de producción. La única integración opcional de esta fase es DeepSeek para interpretar lenguaje natural. `CommercialService` conserva la autoridad exclusiva sobre precios, escalas, mínimos, delivery, ambigüedades y derivaciones.
+El simulador comercial anterior se conserva como componente legacy. `CommercialService` sigue siendo la autoridad determinística sobre precios, escalas, mínimos y reglas comerciales; DeepSeek no forma parte del runtime Meta.
 
 ## Requisitos
 
@@ -31,14 +31,7 @@ pnpm install
 cp .env.example .env
 ```
 
-2. Edite `.env` y complete solo lo que necesite. Para modo determinístico (sin IA), deje `AI_ENABLED=false` y `DEEPSEEK_API_KEY` vacío. Para activar IA:
-
-```bash
-AI_ENABLED=true
-AI_PROVIDER=deepseek
-DEEPSEEK_API_KEY=su_clave_real
-DEEPSEEK_MODEL=deepseek-v4-flash
-```
+2. Edite `.env` con Neon, las credenciales Meta de lectura/webhook y la clave del panel. La configuración opcional del simulador legacy está separada en `.env.legacy.example`.
 
 `.env` está excluido de Git: nunca lo versionee.
 
@@ -58,7 +51,19 @@ La aplicación se conecta con `DATABASE_URL`. En Neon use una URL pooled (`-pool
 pnpm migrate
 ```
 
-Las migraciones están en `database/migrations/` (orden `001_…` a `010_…`) y son idempotentes. En producción el servidor verifica el esquema, pero no ejecuta migraciones automáticamente.
+Las migraciones están en `database/migrations/` (orden `001_…` a `013_…`) y son idempotentes. En producción el servidor verifica el esquema, pero no ejecuta migraciones automáticamente.
+
+## CRM comercial
+
+El CRM vive en `http://localhost:4000/crm` y convive con el panel histórico `/admin`. Antes del primer arranque configure `CRM_BOOTSTRAP_EMAIL` y una `CRM_BOOTSTRAP_PASSWORD` de al menos 12 caracteres.
+
+```bash
+pnpm migrate
+pnpm build:crm
+pnpm start:meta
+```
+
+Incluye autenticación individual, roles administrador/supervisor/asesor, pipeline, responsables, historial de conversación en solo lectura, tareas, notas, cotizaciones con precios de `CommercialService`, PDF, CSV, reportes, notificaciones y auditoría. Los 835 prospectos históricos quedan referenciados desde contactos y oportunidades; las tablas `leads` y `lead_messages` no se reemplazan.
 
 ## Iniciar el simulador
 
@@ -83,13 +88,13 @@ $env:TEST_DATABASE_URL='postgres://...'; pnpm test:postgres
 TEST_DATABASE_URL='postgres://...' pnpm test:postgres
 ```
 
-La prueba real de DeepSeek está desactivada por defecto para no consumir créditos. Con `.env` configurado, ejecútela explícitamente:
+La prueba legacy real de DeepSeek está desactivada por defecto y no pertenece al flujo productivo:
 
 ```bash
 # PowerShell
 $env:RUN_DEEPSEEK_TESTS='1'; node --test test/deepseek.integration.test.mjs
 # bash / Linux
-RUN_DEEPSEEK_TESTS=1 node --test test/deepseek.integration.test.mjs
+RUN_DEEPSEEK_TESTS=1 pnpm test:legacy:deepseek
 ```
 
 ## Capas
@@ -108,12 +113,12 @@ Si `CommercialService` devuelve una condición bloqueada o requiere cotización,
 
 # Nueva arquitectura: captación Meta → leads → handoff WhatsApp (Fase 1)
 
-Capa previa al `CommercialAgent` (ver `Nueva_arquitectura/`): recibe los webhooks de Facebook/Instagram, clasifica la conversación, captura incrementalmente **WhatsApp / producto / modalidad**, persiste el lead y deja todo listo para que un operador haga el traspaso manual a WhatsApp (enlace `wa.me` precargado + confirmación → respuesta automática en Meta).
+Capa independiente del `CommercialAgent`: observa Messenger/Instagram, reconstruye la conversación, extrae **WhatsApp / producto / modalidad**, persiste el lead y deja el traspaso manual a WhatsApp listo. Nunca responde desde nuestra aplicación.
 
 ```text
-Meta Ads → Webhook → Origin Resolver → Clasificador (DeepSeek opcional + fallback)
-  → Social Lead Intake (captura incremental) → leads (PostgreSQL)
-  → Panel /admin → "Abrir WhatsApp" → humano envía → "Marcar como contactado" → confirmación en Meta
+Meta Business Agent → Webhook/Graph GET → ConversationObserver
+  → LeadProcessor determinístico → Neon PostgreSQL
+  → Panel /admin → "Abrir WhatsApp" → humano envía → "Marcar como contactado"
 ```
 
 ## Componentes nuevos
@@ -123,9 +128,9 @@ Meta Ads → Webhook → Origin Resolver → Clasificador (DeepSeek opcional + f
 | `apps/meta-server/` | Servidor: webhook `/webhook/meta`, API `/api/leads`, panel `/admin` |
 | `src/meta/meta-webhook-handler.mjs` | Handshake, firma HMAC (`X-Hub-Signature-256`), normalización, idempotencia |
 | `src/meta/conversation-origin-resolver.mjs` | Origen del mensaje (ad_automation / organic_dm / comment_trigger) |
-| `src/ai/intake-classifier.mjs` | Clasificación + extracción (DeepSeek temperatura 0, fallback determinístico) |
-| `src/meta/social-lead-intake.mjs` | Plantillas de captación (saludo Lima, bloque único, no repetir preguntas) |
-| `src/leads/lead-service.mjs` | Orquestación: estados, captura incremental, mutex por lead, ventana 24 h |
+| `src/meta/conversation-observer.mjs` | Persistencia idempotente de mensajes observados |
+| `src/meta/lead-processor.mjs` | Extracción acumulativa y estados, sin proveedor IA |
+| `src/leads/observer-lead-service.mjs` | Acciones humanas del dashboard, sin escritura en Meta |
 | `src/leads/lead-repository.mjs` (+ in-memory/postgres) | Persistencia de leads, mensajes, eventos e historial de teléfonos |
 | `src/leads/phone-normalizer.mjs` | Normalización E.164 de móviles peruanos |
 | `src/leads/whatsapp-link.mjs` | Enlace `wa.me` con mensaje precargado según contexto |
@@ -140,9 +145,7 @@ pnpm start:meta          # → http://localhost:4000
 pnpm mock:meta "Quiero 20 litros con mi marca, mi número es 955623069"
 ```
 
-Sin `DATABASE_URL` (o si PostgreSQL no responde en desarrollo) usa un repositorio en memoria con advertencia; en producción un fallo de base detiene el arranque. Con `META_PAGE_ACCESS_TOKEN` vacío el envío queda en modo mock. `ADMIN_API_TOKEN` habilita el login por cookie HttpOnly y en producción es obligatorio (mínimo 32 caracteres).
-
-Los mensajes salientes usan un outbox persistente: el panel diferencia pendiente, enviando, reintentando, enviado, fallido y entrega incierta. Los errores 408/429/5xx se reintentan; un timeout ambiguo exige reintento manual para evitar duplicados.
+Sin `DATABASE_URL` (o si PostgreSQL no responde en desarrollo) usa un repositorio en memoria con advertencia; en producción un fallo de base detiene el arranque. `META_PAGE_ACCESS_TOKEN` se usa solo para consultas GET de Messenger e Instagram. `META_SYNC_ONLY_UNREAD=false` evita perder conversaciones que el Business Agent ya atendió. `ADMIN_API_TOKEN` habilita el login por cookie HttpOnly y en producción es obligatorio (mínimo 32 caracteres).
 
 Para analizar historiales importados sin enviar respuestas:
 
@@ -152,17 +155,20 @@ pnpm backfill:leads:apply  # aplica exactamente el plan revisado
 ```
 
 - Handshake webhook: `GET /webhook/meta?hub.mode=subscribe&hub.verify_token=…&hub.challenge=…`
-- Panel interno: `http://localhost:4000/admin` (lista, filtros, detalle, abrir WhatsApp, marcar contactado, tomar control, exportar CSV/Excel)
+- Panel interno: `http://localhost:4000/admin` (lista, filtros, chat read-only, correcciones, abrir WhatsApp, marcar contactado y exportar)
 - Exportación: `GET /api/leads/export.csv` y `GET /api/leads/export.xlsx`
 
 ## Decisiones de diseño (cierran huecos detectados en los documentos)
 
-- **Ventana de 24 h de Meta**: la confirmación en Meta solo se envía si el último mensaje del usuario está dentro de `META_WINDOW_HOURS`; si expiró, el lead queda marcado `meta_confirmation_blocked` y visible en el panel (nunca se miente al prospecto).
-- **Mensaje auto-generado por anuncio**: apertura ligera sin clasificar; el bloque completo de captación se envía una sola vez tras la primera respuesta real.
+- **Observer estricto**: el runtime no instancia sender, outbox ni proveedor IA; los endpoints salientes responden `META_OBSERVER_READ_ONLY`.
 - **Catálogo alineado al dominio comercial**: productos `20l | 1l | 625ml | 10_5l`; modalidades `maquila | distribution_agua_renew | final_customer`; mapeo a `productId` en `product-catalog-map.mjs`.
 - **Estados**: `NEW → COLLECTING → WAITING_PHONE → READY_FOR_WHATSAPP → CONTACT_OPENED → CONTACTED_MANUALLY → CLOSED`; `control_mode` AUTO/HUMAN/PAUSED; máx. 2 aclaraciones antes de pasar a humano.
 - **Idempotencia**: `external_message_id` único en `lead_messages` + mutex por conversación.
-- **No-leads**: `service_provider` recibe respuesta institucional y cierra; spam se cierra sin responder; soporte/empleo derivan con registro.
+- **No-leads**: proveedores, spam, soporte y empleo se registran y cierran sin responder.
+
+## Despliegue Square Cloud
+
+El archivo `squarecloud.app` inicia `npm run start:meta` con 2 GB y reinicio automático. Configure `PORT=80`, `HOST=0.0.0.0`, `DATABASE_URL`, credenciales Meta y `ADMIN_API_TOKEN` en Square Cloud. Ejecute `npm run migrate` con `DATABASE_URL_UNPOOLED` antes de publicar; el servidor nunca migra durante el arranque.
 - **Fase 2** (WhatsApp Cloud API automática) queda preparada: los datos del lead (teléfono/producto/modalidad/origen) y el mapeo a `productId` ya existen para inicializar el `CommercialAgent` sin empezar de cero.
 
 ## Pruebas

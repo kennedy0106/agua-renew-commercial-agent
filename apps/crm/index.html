@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#093f47" />
+    <meta name="description" content="CRM comercial de Agua ReNew" />
+    <title>Agua ReNew · CRM</title>
+    <script>
+      (() => {
+        const saved = localStorage.getItem('agua-renew-crm-theme');
+        const dark = saved === 'dark' || (!saved && matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.classList.toggle('dark', dark);
+        document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+      })();
+    </script>
+  </head>
+  <body>
+    <!--
+      THESIS: Una mesa de control comercial compacta que convierte captación social en acciones visibles; evita el dashboard genérico de tarjetas aisladas.
+      OWN-WORLD: Verde petróleo, marfil cálido, papel blanco, líneas finas, iconografía lineal y densidad editorial inspirada en la guía visual aprobada.
+      STORY: El equipo reconoce prioridades, entiende el pipeline, actúa sobre seguimientos y entra a cada registro sin perder contexto.
+      FIRST VIEWPORT: Sidebar estable; saludo, búsqueda y acción arriba; cuatro KPI; oportunidad prioritaria, tabla reciente, operación, agenda, embudo, tendencia y avisos.
+      FORM: Referencia visual fijada por el usuario, posición uno; seed pinned-reference-2026-09-02.
+      FINISH: static finish review PASS; DESIGN.md and raster prompt provenance complete; authenticated visual breakpoint review requires an active user session
+    -->
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

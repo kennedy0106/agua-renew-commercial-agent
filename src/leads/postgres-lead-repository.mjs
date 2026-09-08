@@ -6,6 +6,7 @@ const LEAD_COLUMNS = {
   sourceChannel: 'source_channel',
   sourceOrigin: 'source_origin',
   sourceAdId: 'source_ad_id',
+  sourceContext: 'source_context',
   sourceConversationId: 'source_conversation_id',
   metaUserId: 'meta_user_id',
   metaUsername: 'meta_username',
@@ -27,6 +28,15 @@ const LEAD_COLUMNS = {
   contactedAt: 'contacted_at',
   metaConfirmationSentAt: 'meta_confirmation_sent_at',
   metaConfirmationBlocked: 'meta_confirmation_blocked',
+  processingVersion: 'processing_version',
+  lastProcessedAt: 'last_processed_at',
+  analysisSummary: 'analysis_summary',
+  suggestedWhatsappMessage: 'suggested_whatsapp_message',
+  analysisSource: 'analysis_source',
+  analysisProvider: 'analysis_provider',
+  analysisModel: 'analysis_model',
+  aiAnalysis: 'ai_analysis',
+  aiAnalyzedAt: 'ai_analyzed_at',
 };
 
 function mapLead(row) {
@@ -35,6 +45,7 @@ function mapLead(row) {
     sourceChannel: row.source_channel,
     sourceOrigin: row.source_origin,
     sourceAdId: row.source_ad_id,
+    sourceContext: row.source_context ?? {},
     sourceConversationId: row.source_conversation_id,
     metaUserId: row.meta_user_id,
     metaUsername: row.meta_username,
@@ -56,6 +67,15 @@ function mapLead(row) {
     contactedAt: row.contacted_at ? new Date(row.contacted_at).toISOString() : null,
     metaConfirmationSentAt: row.meta_confirmation_sent_at ? new Date(row.meta_confirmation_sent_at).toISOString() : null,
     metaConfirmationBlocked: row.meta_confirmation_blocked,
+    processingVersion: row.processing_version,
+    lastProcessedAt: row.last_processed_at ? new Date(row.last_processed_at).toISOString() : null,
+    analysisSummary: row.analysis_summary,
+    suggestedWhatsappMessage: row.suggested_whatsapp_message,
+    analysisSource: row.analysis_source,
+    analysisProvider: row.analysis_provider,
+    analysisModel: row.analysis_model,
+    aiAnalysis: row.ai_analysis ?? {},
+    aiAnalyzedAt: row.ai_analyzed_at ? new Date(row.ai_analyzed_at).toISOString() : null,
     createdAt: new Date(row.created_at).toISOString(),
     updatedAt: new Date(row.updated_at).toISOString(),
   };
@@ -80,16 +100,18 @@ export class PostgresLeadRepository extends LeadRepository {
     const { randomUUID } = await import('node:crypto');
     const result = await this.pool.query(
       `INSERT INTO leads
-        (id, source_channel, source_origin, source_ad_id, source_conversation_id,
+        (id, source_channel, source_origin, source_ad_id, source_context, source_conversation_id,
          meta_user_id, meta_username, automation_triggered)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        ON CONFLICT (source_channel, source_conversation_id) DO UPDATE SET
          meta_username = COALESCE(leads.meta_username, EXCLUDED.meta_username),
-         meta_user_id = COALESCE(leads.meta_user_id, EXCLUDED.meta_user_id)
+         meta_user_id = COALESCE(leads.meta_user_id, EXCLUDED.meta_user_id),
+         source_ad_id = COALESCE(leads.source_ad_id, EXCLUDED.source_ad_id),
+         source_context = CASE WHEN leads.source_context = '{}'::jsonb THEN EXCLUDED.source_context ELSE leads.source_context END
        RETURNING *`,
       [randomUUID(), data.sourceChannel, data.sourceOrigin ?? null, data.sourceAdId ?? null,
-        data.sourceConversationId, data.metaUserId ?? null, data.metaUsername ?? null,
-        data.automationTriggered === true],
+        JSON.stringify(data.sourceContext ?? {}), data.sourceConversationId, data.metaUserId ?? null,
+        data.metaUsername ?? null, data.automationTriggered === true],
     );
     return mapLead(result.rows[0]);
   }
@@ -159,7 +181,7 @@ export class PostgresLeadRepository extends LeadRepository {
 
   async listMessages(leadId) {
     const result = await this.pool.query(
-      'SELECT * FROM lead_messages WHERE lead_id = $1 ORDER BY sequence_no ASC',
+      'SELECT * FROM lead_messages WHERE lead_id = $1 ORDER BY COALESCE(source_created_at, created_at) ASC, sequence_no ASC',
       [leadId],
     );
     return result.rows.map(mapMessage);
@@ -240,7 +262,7 @@ export class PostgresLeadRepository extends LeadRepository {
     return result.rows.map(mapPhoneHistory);
   }
 
-  async listLeads({ status = null, channel = null, conversationType = null, from = null, to = null, limit = 100, offset = 0 } = {}) {
+  #leadFilter({ status = null, channel = null, conversationType = null, from = null, to = null, search = null } = {}) {
     const conditions = [];
     const values = [];
     if (status) { values.push(status); conditions.push(`status = $${values.length}`); }
@@ -248,13 +270,42 @@ export class PostgresLeadRepository extends LeadRepository {
     if (conversationType) { values.push(conversationType); conditions.push(`conversation_type = $${values.length}`); }
     if (from) { values.push(new Date(from)); conditions.push(`created_at >= $${values.length}`); }
     if (to) { values.push(new Date(to)); conditions.push(`created_at <= $${values.length}`); }
+    if (search) {
+      values.push(`%${String(search).trim()}%`);
+      conditions.push(`(meta_username ILIKE $${values.length} OR phone_e164 ILIKE $${values.length})`);
+    }
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    return { where, values };
+  }
+
+  async listLeads({ limit = 100, offset = 0, sort = 'createdAt', direction = 'desc', ...filters } = {}) {
+    const { where, values } = this.#leadFilter(filters);
+    const sortColumn = { createdAt: 'created_at', metaUsername: 'meta_username', status: 'status', product: 'product' }[sort] ?? 'created_at';
+    const sortDirection = direction === 'asc' ? 'ASC' : 'DESC';
     values.push(limit, offset);
     const result = await this.pool.query(
-      `SELECT * FROM leads ${where} ORDER BY created_at DESC LIMIT $${values.length - 1} OFFSET $${values.length}`,
+      `SELECT * FROM leads ${where} ORDER BY ${sortColumn} ${sortDirection} NULLS LAST LIMIT $${values.length - 1} OFFSET $${values.length}`,
       values,
     );
     return result.rows.map(mapLead);
+  }
+
+  async countLeads(filters = {}) {
+    const { where, values } = this.#leadFilter(filters);
+    const result = await this.pool.query(
+      `SELECT count(*)::int AS total,
+              count(*) FILTER (WHERE phone_e164 IS NULL)::int AS missing_phone,
+              count(*) FILTER (WHERE status = 'READY_FOR_WHATSAPP')::int AS ready,
+              count(*) FILTER (WHERE status IN ('CONTACT_OPENED','CONTACTED_MANUALLY'))::int AS contacted
+       FROM leads ${where}`,
+      values,
+    );
+    return {
+      total: result.rows[0].total,
+      missingPhone: result.rows[0].missing_phone,
+      ready: result.rows[0].ready,
+      contacted: result.rows[0].contacted,
+    };
   }
 
   async countLeadsByStatus() {

@@ -58,7 +58,7 @@ test('API: detalle incluye mensajes y enlace de WhatsApp generado', async () => 
   assert.match(response.body.whatsappLink.url, /^https:\/\/wa\.me\/51955623069\?text=/);
 });
 
-test('API: acciones del operador (abrir, contactar, control, teléfono, cerrar)', async () => {
+test('API: acciones del operador y bloqueo del control Meta', async () => {
   const { api, seed } = makeApi();
   const id = await seed();
 
@@ -69,7 +69,8 @@ test('API: acciones del operador (abrir, contactar, control, teléfono, cerrar)'
   assert.equal(r.body.lead.status, 'CONTACTED_MANUALLY');
 
   r = await api.handle({ method: 'POST', pathname: `/api/leads/${id}/control`, headers: AUTH, body: { controlMode: 'HUMAN' } });
-  assert.equal(r.body.lead.controlMode, 'HUMAN');
+  assert.equal(r.status, 405);
+  assert.equal(r.body.code, 'META_OBSERVER_READ_ONLY');
 
   r = await api.handle({ method: 'POST', pathname: `/api/leads/${id}/phone`, headers: AUTH, body: { phone: '999999999' } });
   assert.equal(r.body.lead.phoneE164, '+51999999999');
@@ -98,17 +99,17 @@ test('API: filtros con limit/offset inválidos no rompen la consulta', async () 
   assert.equal(big.status, 200);
 });
 
-test('API: interruptor de auto-respuesta (GET/POST)', async () => {
+test('API: auto-respuesta está retirada en modo observer', async () => {
   const { api } = makeApi();
   const before = await api.handle({ method: 'GET', pathname: '/api/leads/autoreply', headers: AUTH, body: {} });
-  assert.equal(before.status, 200);
-  assert.equal(before.body.autoReplyEnabled, true); // default en tests
+  assert.equal(before.status, 405);
+  assert.equal(before.body.code, 'META_OBSERVER_READ_ONLY');
 
   const off = await api.handle({ method: 'POST', pathname: '/api/leads/autoreply', headers: AUTH, body: { enabled: false } });
-  assert.equal(off.body.autoReplyEnabled, false);
+  assert.equal(off.status, 405);
 
   const on = await api.handle({ method: 'POST', pathname: '/api/leads/autoreply', headers: AUTH, body: { enabled: true } });
-  assert.equal(on.body.autoReplyEnabled, true);
+  assert.equal(on.status, 405);
 });
 
 test('API: exportación CSV y XLSX con filtros', async () => {

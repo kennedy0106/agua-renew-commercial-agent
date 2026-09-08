@@ -8,10 +8,13 @@
   },
   "scripts": {
     "test": "node --test",
-    "test:postgres": "node --test test/lead-postgres.integration.test.mjs test/postgres-persistence.integration.test.mjs",
-    "test:deepseek": "set RUN_DEEPSEEK_TESTS=1&& node --test test/deepseek.integration.test.mjs",
+    "test:postgres": "node scripts/run-postgres-integration.mjs",
+    "test:legacy:deepseek": "set RUN_DEEPSEEK_TESTS=1&& node --test test/deepseek.integration.test.mjs",
     "start:simulator": "node apps/simulator/server.mjs",
     "start:meta": "node apps/meta-server/server.mjs",
+    "dev:crm": "vite --config apps/crm/vite.config.js",
+    "build:crm": "vite build --config apps/crm/vite.config.js",
+    "preview:crm": "vite preview --config apps/crm/vite.config.js",
     "mock:meta": "node scripts/mock-meta.mjs",
     "migrate": "node scripts/migrate.mjs",
     "backfill:leads": "node scripts/backfill-leads.mjs --dry-run",
@@ -21,6 +24,13 @@
     "eval:compare": "node eval/cli.mjs --compare"
   },
   "dependencies": {
-    "pg": "^8.13.1"
+    "@dnd-kit/core": "^6.3.1",
+    "pg": "^8.13.1",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite": "^6.1.0"
   }
 }

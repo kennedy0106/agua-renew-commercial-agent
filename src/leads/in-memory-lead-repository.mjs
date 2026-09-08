@@ -24,7 +24,7 @@ export class InMemoryLeadRepository extends LeadRepository {
     const now = new Date();
     const lead = {
       id: randomUUID(),
-      sourceChannel: null, sourceOrigin: null, sourceAdId: null, sourceConversationId: null,
+      sourceChannel: null, sourceOrigin: null, sourceAdId: null, sourceContext: {}, sourceConversationId: null,
       metaUserId: null, metaUsername: null,
       conversationType: null, classificationConfidence: null,
       automationTriggered: false,
@@ -35,6 +35,9 @@ export class InMemoryLeadRepository extends LeadRepository {
       lastReplyAt: null, modalityAskCount: 0,
       lastInboundAt: null, whatsappOpenedAt: null, contactedAt: null,
       metaConfirmationSentAt: null, metaConfirmationBlocked: false,
+      processingVersion: null, lastProcessedAt: null,
+      analysisSummary: null, suggestedWhatsappMessage: null, analysisSource: null,
+      analysisProvider: null, analysisModel: null, aiAnalysis: {}, aiAnalyzedAt: null,
       createdAt: now, updatedAt: now,
       ...data,
     };
@@ -103,7 +106,11 @@ export class InMemoryLeadRepository extends LeadRepository {
 
   async listMessages(leadId) {
     const list = this.messagesByLead.get(leadId) ?? [];
-    return clone([...list].sort((a, b) => a.sequenceNo - b.sequenceNo));
+    return clone([...list].sort((a, b) => {
+      const left = new Date(a.sourceCreatedAt ?? a.createdAt).getTime();
+      const right = new Date(b.sourceCreatedAt ?? b.createdAt).getTime();
+      return left - right || a.sequenceNo - b.sequenceNo;
+    }));
   }
 
   async enqueueOutbound({ leadId, channel, actorType, actorId = null, content, purpose,
@@ -147,15 +154,41 @@ export class InMemoryLeadRepository extends LeadRepository {
     this.phoneHistoryByLead.delete(id);
   }
 
-  async listLeads({ status = null, channel = null, conversationType = null, from = null, to = null, limit = 100, offset = 0 } = {}) {
+  #filteredLeads({ status = null, channel = null, conversationType = null, from = null, to = null, search = null } = {}) {
     let list = [...this.leads.values()];
     if (status) list = list.filter((lead) => lead.status === status);
     if (channel) list = list.filter((lead) => lead.sourceChannel === channel);
     if (conversationType) list = list.filter((lead) => lead.conversationType === conversationType);
     if (from) list = list.filter((lead) => lead.createdAt >= new Date(from));
     if (to) list = list.filter((lead) => lead.createdAt <= new Date(to));
-    list.sort((a, b) => b.createdAt - a.createdAt);
+    if (search) {
+      const needle = String(search).trim().toLowerCase();
+      const digits = needle.replace(/\D/g, '');
+      list = list.filter((lead) => String(lead.metaUsername ?? '').toLowerCase().includes(needle) ||
+        (digits && String(lead.phoneE164 ?? '').replace(/\D/g, '').includes(digits)));
+    }
+    return list;
+  }
+
+  async listLeads({ limit = 100, offset = 0, sort = 'createdAt', direction = 'desc', ...filters } = {}) {
+    const list = this.#filteredLeads(filters);
+    const multiplier = direction === 'asc' ? 1 : -1;
+    list.sort((a, b) => {
+      const left = sort.endsWith('At') ? new Date(a[sort] ?? 0).getTime() : String(a[sort] ?? '').toLowerCase();
+      const right = sort.endsWith('At') ? new Date(b[sort] ?? 0).getTime() : String(b[sort] ?? '').toLowerCase();
+      return left < right ? -multiplier : left > right ? multiplier : 0;
+    });
     return clone(list.slice(offset, offset + limit));
+  }
+
+  async countLeads(filters = {}) {
+    const list = this.#filteredLeads(filters);
+    return {
+      total: list.length,
+      missingPhone: list.filter((lead) => !lead.phoneE164).length,
+      ready: list.filter((lead) => lead.status === 'READY_FOR_WHATSAPP').length,
+      contacted: list.filter((lead) => ['CONTACT_OPENED', 'CONTACTED_MANUALLY'].includes(lead.status)).length,
+    };
   }
 
   async countLeadsByStatus() {

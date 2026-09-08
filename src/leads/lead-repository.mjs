@@ -14,6 +14,7 @@ export class LeadRepository {
   async recordPhoneHistory() { throw new Error('Not implemented'); }
   async listPhoneHistory() { throw new Error('Not implemented'); }
   async listLeads() { throw new Error('Not implemented'); }
+  async countLeads() { throw new Error('Not implemented'); }
   async countLeadsByStatus() { throw new Error('Not implemented'); }
   async deleteLead() { throw new Error('Not implemented'); }
   async claimDueOutbound() { throw new Error('Not implemented'); }

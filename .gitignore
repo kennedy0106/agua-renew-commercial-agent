@@ -7,6 +7,7 @@ node_modules/
 .env
 .env.*
 !.env.example
+!.env.legacy.example
 
 # ── Logs ──────────────────────────────────────────────────────
 *.log
@@ -48,3 +49,16 @@ knowledge/agua_renew_commercial_kb.md
 # ── Evaluación (Bloque D): transcripciones crudas por corrida (los reportes
 #    latest.json/latest.md SÍ se versionan) ─
 eval/results/
+
+# ── Herramientas locales de agentes y prototipado ────────────
+.agents/
+.codex-run/
+.codex-runtime/
+.hermes/
+.impeccable/
+apps/crm/.impeccable/
+apps/crm/prototypes/
+graphify-out/
+graphify-readme.md
+skills-lock.json
+tmp/

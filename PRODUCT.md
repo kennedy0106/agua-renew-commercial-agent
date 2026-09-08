@@ -1,4 +1,4 @@
-# Agua ReNew · Captación de leads
+# Agua ReNew · CRM comercial
 
 <!-- impeccable:product-schema 1 -->
 
@@ -8,24 +8,39 @@ web
 
 ## Users
 
-Equipo comercial y administradores de Agua ReNew que atienden prospectos provenientes de Facebook Messenger e Instagram y los derivan a WhatsApp.
+Administradores, supervisores y asesores de Agua ReNew que gestionan prospectos provenientes de Facebook Messenger e Instagram y los continúan por WhatsApp.
 
 ## Product Purpose
 
-Centralizar prospectos sociales, mostrar el estado de cada conversación y ayudar al equipo a completar el handoff a WhatsApp sin perder el historial ni el contexto operativo.
+Convertir la captación social existente en un proceso comercial trazable, con el CRM como centro de control entre la observación de Meta, la revisión humana y el contacto manual por WhatsApp.
 
 ## Positioning
 
-Une captación social, clasificación comercial, conversación operativa y derivación verificable a WhatsApp dentro de un único panel adaptado al flujo real de Agua ReNew.
+Une captación social, pipeline, trabajo del equipo, reglas comerciales y reportes dentro de un CRM propio adaptado al flujo real de Agua ReNew.
 
 ## Operating Context
 
-Uso diario en escritorio y móvil. Los operadores revisan leads nuevos, filtran y ordenan la lista, abren conversaciones, corrigen teléfonos, toman control manual, envían respuestas y registran el contacto.
+Uso diario en escritorio y móvil. El equipo prioriza oportunidades desde la Bandeja Meta, valida la clasificación automática, asigna responsables, programa seguimientos, registra notas, genera cotizaciones y mide conversión.
 
 ## Capabilities and Constraints
 
-- Mantener autenticación administrativa, sincronización, auto-respuesta, exportación CSV/XLSX, filtros, orden, detalle de conversación y acciones existentes.
-- Interfaz estática servida por Node.js, sin framework de frontend ni paso de compilación.
+- Mantener el panel administrativo histórico y su exportación completa como superficie de compatibilidad.
+- CRM React compilado por Vite y servido por el mismo proceso Node.js bajo `/crm`.
+- Autenticación individual persistente, CSRF, limitación de intentos, roles ADMIN/SUPERVISOR/ADVISOR y auditoría.
+- Contactos, empresas preparadas en modelo, oportunidades, pipeline, tareas, notas, actividades y notificaciones.
+- Bandeja Meta organizada en Por revisar, Listos, Faltan datos, Sin asignar, Mis leads y Derivados.
+- Flujo de intervención humana: asumir la oportunidad, confirmar su clasificación, confirmar consentimiento, registrar el handoff y abrir WhatsApp manualmente.
+- RBAC por ownership: ADVISOR ve oportunidades sin asignar y propias, y solo modifica o deriva las propias; ADMIN y SUPERVISOR gestionan el conjunto y sus responsables.
+- La migración 016 incorpora estados de calificación `UNREVIEWED`/`NEEDS_DATA`/`READY`/`CLAIMED`/`HANDED_OFF`, intención `EXPLORING`/`INTERESTED`/`QUALIFIED`/`READY_TO_BUY`, calidad `INSUFFICIENT`/`PARTIAL`/`COMPLETE` y origen de clasificación `IMPORTED`/`AUTOMATION`/`HUMAN`, además de marcas de clasificación, asignación, handoff y última actividad de Meta.
+- Catálogo comercial conectado a las reglas de precios vigentes.
+- Cotizaciones multiproducto con descuentos por línea, PDF generado por backend y conversión automática a pedido al aceptar.
+- Gestión de pedidos y registro de pagos sobre cotizaciones aceptadas.
+- Calendario mensual en escritorio y agenda móvil por día para eventos y tareas.
+- Automatizaciones y seguimiento de SLA sujetos a RBAC; ADMIN y SUPERVISOR gestionan reglas y la ejecución manual queda reservada a ADMIN.
+- Comunicaciones preparadas como plantillas y borradores auditables, con handoff manual al canal externo; Meta permanece estrictamente en observación y el CRM no escribe en ese canal.
+- Reportes avanzados por periodo sobre ingresos, cotizaciones, ciclo y primera respuesta, conversión por etapa, responsables, origen, SLA y motivos de pérdida.
+- Paginación, búsqueda y filtros son de servidor; CSV y PDF son generados por backend.
+- Los precios de cotización proceden exclusivamente de `CommercialService`.
 - Copy operativo en español, fechas en hora Lima y datos procedentes del backend actual.
 - No inventar métricas, usuarios, permisos ni capacidades que el backend no expone.
 

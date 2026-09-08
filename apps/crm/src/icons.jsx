@@ -1,0 +1,36 @@
+const paths = {
+  dashboard: <><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></>,
+  pipeline: <><path d="M4 6h16M7 12h10M10 18h4"/><circle cx="4" cy="6" r="1"/><circle cx="7" cy="12" r="1"/><circle cx="10" cy="18" r="1"/></>,
+  users: <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></>,
+  reports: <><path d="M4 19V9M10 19V5M16 19v-7M22 19V2"/><path d="M2 22h22"/></>,
+  bell: <><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></>,
+  search: <><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></>,
+  plus: <path d="M12 5v14M5 12h14"/>,
+  arrow: <path d="m9 18 6-6-6-6"/>,
+  close: <path d="M18 6 6 18M6 6l12 12"/>,
+  check: <path d="m20 6-11 11-5-5"/>,
+  logout: <><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5M21 12H9"/></>,
+  menu: <path d="M4 6h16M4 12h16M4 18h16"/>,
+  message: <path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/>,
+  inbox: <><path d="M4 4h16l2 10v6H2v-6z"/><path d="M2 14h6l2 3h4l2-3h6"/></>,
+  task: <><rect x="3" y="3" width="18" height="18" rx="3"/><path d="m8 12 3 3 5-6"/></>,
+  contact: <><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></>,
+  company: <><path d="M3 21h18M5 21V5l7-3v19M12 8h7v13M8 8h1M8 12h1M8 16h1M15 12h1M15 16h1"/></>,
+  calendar: <><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></>,
+  merge: <><path d="M6 3v4c0 3 2 5 5 5h7M6 21v-4c0-3 2-5 5-5"/><path d="m15 9 3 3-3 3"/></>,
+  note: <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></>,
+  quote: <><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6M9 13h8M9 17h5"/></>,
+  whatsapp: <><path d="M20.5 11.8a8.5 8.5 0 0 1-12.6 7.4L3 21l1.7-4.7A8.5 8.5 0 1 1 20.5 11.8z"/><path d="M8.4 7.5c1 4.8 3.2 7 8 8"/></>,
+  calendarDays: <><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18M7 14h2M11 14h2M15 14h2M7 18h2M11 18h2"/></>,
+  order: <><path d="m21 8-9 5-9-5 9-5z"/><path d="m3 8 9 5 9-5v9l-9 5-9-5zM12 13v9"/></>,
+  mail: <><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></>,
+  automation: <><path d="M4 7h10M4 17h16M14 7l3-3M14 7l3 3M10 17l-3-3M10 17l-3 3"/></>,
+  play: <><circle cx="12" cy="12" r="9"/><path d="m10 8 6 4-6 4z"/></>,
+  clock: <><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></>,
+  shield: <><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/><path d="m9 12 2 2 4-4"/></>,
+  arrowBack: <path d="m15 18-6-6 6-6"/>,
+};
+
+export function Icon({ name, size = 20, className = '' }) {
+  return <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>;
+}

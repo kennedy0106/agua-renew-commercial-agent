@@ -30,36 +30,30 @@ export class LeadsApi {
       // Lista con filtros + conteos
       if (method === 'GET' && pathname === '/api/leads') {
         const filters = readFilters(query);
-        const [leads, counts] = await Promise.all([
+        const [leads, counts, totals] = await Promise.all([
           this.repository.listLeads(filters),
           this.repository.countLeadsByStatus(),
+          this.repository.countLeads(filters),
         ]);
-        return json(200, { leads, counts, filters });
+        return json(200, { leads, counts, totals, filters });
       }
 
       // Exportaciones
       if (method === 'GET' && pathname === '/api/leads/export.csv') {
-        const leads = await this.repository.listLeads(readFilters(query));
+        const filters = readFilters(query, { exportAll: true });
+        const leads = await this.repository.listLeads(filters);
         return buffer(200, Buffer.from(leadsToCsv(leads), 'utf8'), 'text/csv; charset=utf-8');
       }
       if (method === 'GET' && pathname === '/api/leads/export.xlsx') {
-        const leads = await this.repository.listLeads(readFilters(query));
+        const filters = readFilters(query, { exportAll: true });
+        const leads = await this.repository.listLeads(filters);
         return buffer(200, leadsToXlsx(leads), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       }
 
-      // Interruptor global de auto-respuesta (control manual).
-      if (method === 'POST' && pathname === '/api/leads/autoreply') {
-        return json(200, { autoReplyEnabled: this.leadService.setAutoReplyEnabled(body.enabled === true) });
-      }
-      if (method === 'GET' && pathname === '/api/leads/autoreply') {
-        return json(200, { autoReplyEnabled: this.leadService.autoReplyEnabled });
-      }
+      if (pathname === '/api/leads/autoreply') return observerReadOnly();
 
       const retry = pathname.match(/^\/api\/leads\/([0-9a-f-]+)\/messages\/([0-9a-f-]+)\/retry$/i);
-      if (method === 'POST' && retry) {
-        const actor = headers['X-Operator'] ?? headers['x-operator'] ?? 'operator';
-        return json(202, await this.leadService.retryMessage(retry[1], retry[2], actor));
-      }
+      if (method === 'POST' && retry) return observerReadOnly();
 
       const action = pathname.match(/^\/api\/leads\/([0-9a-f-]+)(?:\/([a-z-]+))?$/i);
       if (!action) return json(404, { error: 'No encontrado' });
@@ -87,20 +81,17 @@ export class LeadsApi {
         case 'contact':
           return json(200, { lead: await this.leadService.markContacted(id, actor) });
         case 'control':
-          return json(200, { lead: await this.leadService.setControlMode(id, body.controlMode, actor) });
+          return observerReadOnly();
         case 'phone':
           return json(200, { lead: await this.leadService.correctPhone(id, body.phone, actor) });
         case 'close':
           return json(200, { lead: await this.leadService.closeLead(id, actor) });
         case 'delete':
           return json(200, await this.leadService.deleteLead(id, actor));
-        case 'send-message': {
-          const text = String(body.text ?? '').trim();
-          if (!text) return json(400, { error: 'El mensaje no puede estar vacío' });
-          return json(202, await this.leadService.sendMessage(id, text, actor));
-        }
+        case 'send-message':
+          return observerReadOnly();
         case 'request-whatsapp':
-          return json(202, await this.leadService.requestWhatsapp(id, actor));
+          return observerReadOnly();
         case 'reopen':
           return json(200, { lead: await this.leadService.reopenLead(id, actor) });
         case 'edit':
@@ -121,11 +112,18 @@ function json(status, body) {
   return { status, headers: { 'Content-Type': 'application/json; charset=utf-8' }, body };
 }
 
+function observerReadOnly() {
+  return json(405, {
+    error: 'El panel funciona en modo observación; Meta Business Agent gestiona las respuestas.',
+    code: 'META_OBSERVER_READ_ONLY',
+  });
+}
+
 function buffer(status, body, contentType) {
   return { status, headers: { 'Content-Type': contentType, 'Content-Disposition': 'attachment' }, body };
 }
 
-function readFilters(query) {
+function readFilters(query, { exportAll = false } = {}) {
   const q = query instanceof URLSearchParams ? Object.fromEntries(query) : (query ?? {});
   const limit = Number(q.limit);
   const offset = Number(q.offset);
@@ -135,7 +133,10 @@ function readFilters(query) {
     conversationType: q.conversationType || null,
     from: q.from || null,
     to: q.to || null,
-    limit: Number.isFinite(limit) && limit > 0 ? Math.min(Math.floor(limit), 500) : 100,
+    search: q.q || q.search || null,
+    sort: q.sort || 'createdAt',
+    direction: q.direction === 'asc' ? 'asc' : 'desc',
+    limit: exportAll ? 100_000 : (Number.isFinite(limit) && limit > 0 ? Math.min(Math.floor(limit), 100) : 25),
     offset: Number.isFinite(offset) && offset > 0 ? Math.floor(offset) : 0,
   };
 }

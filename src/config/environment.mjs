@@ -12,17 +12,19 @@ export function loadEnvironment(file = '.env') {
 }
 
 export function aiConfigurationFromEnvironment() {
+  const provider = process.env.AI_PROVIDER ?? 'deepseek';
   return {
     enabled: process.env.AI_ENABLED === 'true',
     conversationArchitecture: process.env.CONVERSATION_ARCHITECTURE === 'legacy' ? 'legacy' : 'agent',
-    provider: process.env.AI_PROVIDER,
-    deepseek: {
-      apiKey: process.env.DEEPSEEK_API_KEY,
-      model: process.env.DEEPSEEK_MODEL,
-      baseUrl: process.env.DEEPSEEK_BASE_URL,
-      timeoutMs: Number(process.env.DEEPSEEK_TIMEOUT_MS ?? 60_000),
-      maxTokens: Number(process.env.DEEPSEEK_MAX_TOKENS ?? 30_000),
-      thinkingMode: process.env.DEEPSEEK_THINKING_MODE ?? 'disabled',
+    provider,
+    compatible: {
+      providerName: provider,
+      apiKey: process.env.AI_API_KEY ?? process.env.DEEPSEEK_API_KEY,
+      model: process.env.AI_MODEL ?? process.env.DEEPSEEK_MODEL,
+      baseUrl: process.env.AI_BASE_URL ?? process.env.DEEPSEEK_BASE_URL,
+      timeoutMs: Number(process.env.AI_TIMEOUT_MS ?? process.env.DEEPSEEK_TIMEOUT_MS ?? 60_000),
+      maxTokens: Number(process.env.AI_MAX_TOKENS ?? process.env.DEEPSEEK_MAX_TOKENS ?? 4_096),
+      thinkingMode: process.env.AI_THINKING_MODE ?? process.env.DEEPSEEK_THINKING_MODE ?? null,
     },
   };
 }

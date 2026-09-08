@@ -40,10 +40,11 @@ export class AIProviderError extends Error {
 
 /** DeepSeek OpenAI-compatible Chat Completions adapter. */
 export class DeepSeekProvider extends AIProvider {
-  constructor({ apiKey, model, baseUrl, timeoutMs = 60_000, maxTokens = 4_096, thinkingMode = null, emptyResponseRetries = 1, fetchImpl = fetch }) {
+  constructor({ apiKey, model, baseUrl, providerName = 'deepseek', timeoutMs = 60_000, maxTokens = 4_096, thinkingMode = null, emptyResponseRetries = 1, fetchImpl = fetch }) {
     super();
     this.apiKey = apiKey;
     this.model = model;
+    this.providerName = providerName;
     this.baseUrl = baseUrl?.replace(/\/$/, '');
     this.timeoutMs = timeoutMs;
     this.maxTokens = maxTokens;
@@ -64,7 +65,7 @@ export class DeepSeekProvider extends AIProvider {
       responseFormat: { type: 'json_object' },
     });
     if (typeof result.content === 'string' && result.content.trim()) return result;
-    throw new AIProviderError('empty_response', 'DeepSeek returned no JSON content.', result);
+    throw new AIProviderError('empty_response', `${this.providerName} no devolvió contenido JSON.`, result);
   }
 
   /**
@@ -75,7 +76,7 @@ export class DeepSeekProvider extends AIProvider {
    */
   async complete({ messages, tools = undefined, toolChoice = undefined, responseFormat = undefined, temperature = 0, maxTokens = this.maxTokens }) {
     if (!this.isConfigured()) {
-      throw new AIProviderError('not_configured', 'DeepSeek no está configurado.');
+      throw new AIProviderError('not_configured', `${this.providerName} no está configurado.`);
     }
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
@@ -108,7 +109,7 @@ export class DeepSeekProvider extends AIProvider {
         signal: controller.signal,
         });
         if (!response.ok) {
-          throw new AIProviderError('http_error', `DeepSeek respondió HTTP ${response.status}.`);
+          throw new AIProviderError('http_error', `${this.providerName} respondió HTTP ${response.status}.`);
         }
         const body = await response.json();
         const choice = body.choices?.[0];
@@ -120,7 +121,7 @@ export class DeepSeekProvider extends AIProvider {
         const content = compatibilityToolCalls.length ? removeDsmlToolMarkup(rawContent) : rawContent;
         if ((typeof content === 'string' && content.trim()) || toolCalls.length) {
           return {
-            provider: 'deepseek',
+            provider: this.providerName,
             model: this.model,
             content,
             latencyMs: Math.round(performance.now() - startedAt),
@@ -132,8 +133,8 @@ export class DeepSeekProvider extends AIProvider {
             toolCallFormat: compatibilityToolCalls.length ? 'deepseek_dsml_compat' : nativeToolCalls.length ? 'native' : null,
           };
         }
-        emptyResponse = new AIProviderError('empty_response', 'DeepSeek returned no JSON content.', {
-          provider: 'deepseek',
+        emptyResponse = new AIProviderError('empty_response', `${this.providerName} no devolvió contenido JSON.`, {
+          provider: this.providerName,
           model: this.model,
           latencyMs: Math.round(performance.now() - startedAt),
           inputTokens: body.usage?.prompt_tokens ?? null,
@@ -160,11 +161,14 @@ export class DeepSeekProvider extends AIProvider {
     } catch (error) {
       if (error instanceof AIProviderError) throw error;
       if (error?.name === 'AbortError') {
-        throw new AIProviderError('timeout', 'La llamada a DeepSeek excedió el tiempo máximo.');
+        throw new AIProviderError('timeout', `La llamada a ${this.providerName} excedió el tiempo máximo.`);
       }
-      throw new AIProviderError('network_error', 'No fue posible comunicarse con DeepSeek.');
+      throw new AIProviderError('network_error', `No fue posible comunicarse con ${this.providerName}.`);
     } finally {
       clearTimeout(timeout);
     }
   }
 }
+
+/** Nombre neutral para el runtime: funciona con cualquier Chat Completions compatible con OpenAI. */
+export class OpenAICompatibleProvider extends DeepSeekProvider {}

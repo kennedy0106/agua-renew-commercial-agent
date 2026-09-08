@@ -36,64 +36,55 @@ function makeApi() {
 
 const AUTH = { Authorization: 'Bearer sekret' };
 
-test('API: enviar mensaje del operador lo encola sin afirmar entrega', async () => {
+test('API observer: enviar mensaje del operador está bloqueado y no encola', async () => {
   const { api, repository, sender, seed } = makeApi();
   const id = await seed();
   const response = await api.handle({ method: 'POST', pathname: `/api/leads/${id}/send-message`, headers: AUTH, body: { text: 'Hola, ¿me confirma su número?' } });
-  assert.equal(response.status, 202);
+  assert.equal(response.status, 405);
+  assert.equal(response.body.code, 'META_OBSERVER_READ_ONLY');
   assert.equal(sender.length, 0);
   const messages = await repository.listMessages(id);
   const outbound = messages.filter((m) => m.direction === 'outbound');
-  assert.equal(outbound.length, 1);
-  assert.equal(outbound[0].actorType, 'operator');
-  assert.equal(outbound[0].deliveryStatus, 'PENDING');
-  assert.equal(outbound[0].purpose, 'operator_reply');
-  const events = await repository.listEvents(id);
-  assert.ok(events.some((e) => e.eventType === 'OUTBOUND_QUEUED'));
+  assert.equal(outbound.length, 0);
 });
 
-test('API: enviar mensaje vacío devuelve 400', async () => {
+test('API observer: incluso un mensaje vacío devuelve el bloqueo estable', async () => {
   const { api, seed } = makeApi();
   const id = await seed();
   const response = await api.handle({ method: 'POST', pathname: `/api/leads/${id}/send-message`, headers: AUTH, body: { text: '   ' } });
-  assert.equal(response.status, 400);
+  assert.equal(response.status, 405);
+  assert.equal(response.body.code, 'META_OBSERVER_READ_ONLY');
 });
 
-test('API: reintento manual vuelve a encolar un mensaje fallido', async () => {
-  const { api, repository, seed } = makeApi();
+test('API observer: reintento manual está bloqueado', async () => {
+  const { api, seed } = makeApi();
   const id = await seed();
-  const queued = await api.handle({
-    method: 'POST', pathname: `/api/leads/${id}/send-message`, headers: AUTH, body: { text: 'Mensaje operativo' },
-  });
-  await repository.markOutboundFailed(queued.body.message.id, { errorCode: '400', errorMessage: 'Solicitud rechazada' });
-
   const response = await api.handle({
-    method: 'POST', pathname: `/api/leads/${id}/messages/${queued.body.message.id}/retry`, headers: AUTH, body: {},
+    method: 'POST', pathname: `/api/leads/${id}/messages/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/retry`, headers: AUTH, body: {},
   });
-
-  assert.equal(response.status, 202);
-  assert.equal(response.body.message.deliveryStatus, 'PENDING');
-  const events = await repository.listEvents(id);
-  assert.ok(events.some((event) => event.eventType === 'OUTBOUND_REQUEUED'));
+  assert.equal(response.status, 405);
+  assert.equal(response.body.code, 'META_OBSERVER_READ_ONLY');
 });
 
-test('API: pedir WhatsApp encola la plantilla askPhone y registra evento', async () => {
+test('API observer: pedir WhatsApp está bloqueado y no crea eventos salientes', async () => {
   const { api, repository, sender, seed } = makeApi();
   const id = await seed();
   const response = await api.handle({ method: 'POST', pathname: `/api/leads/${id}/request-whatsapp`, headers: AUTH, body: {} });
-  assert.equal(response.status, 202);
+  assert.equal(response.status, 405);
+  assert.equal(response.body.code, 'META_OBSERVER_READ_ONLY');
   assert.equal(sender.length, 0);
-  const events = await repository.listEvents(response.body.lead.id);
-  assert.ok(events.some((e) => e.eventType === 'PHONE_REQUESTED'));
+  const events = await repository.listEvents(id);
+  assert.equal(events.some((e) => e.eventType === 'PHONE_REQUESTED'), false);
 });
 
-test('API: pedir WhatsApp a un lead que ya tiene teléfono devuelve 400', async () => {
+test('API observer: pedir WhatsApp sigue bloqueado aunque el lead tenga teléfono', async () => {
   const { api, seed } = makeApi();
   const id = await seed();
   // El router stub no extrae teléfono; lo asignamos con la acción correctPhone.
   await api.handle({ method: 'POST', pathname: `/api/leads/${id}/phone`, headers: AUTH, body: { phone: '955623069' } });
   const response = await api.handle({ method: 'POST', pathname: `/api/leads/${id}/request-whatsapp`, headers: AUTH, body: {} });
-  assert.equal(response.status, 400);
+  assert.equal(response.status, 405);
+  assert.equal(response.body.code, 'META_OBSERVER_READ_ONLY');
 });
 
 test('API: reabrir un lead cerrado lo vuelve a Nuevo con evento', async () => {
