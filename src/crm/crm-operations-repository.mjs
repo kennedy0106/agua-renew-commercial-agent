@@ -105,7 +105,9 @@ export class CrmOperationsRepository extends CrmRepository {
       let value = clean(raw); if (key === 'email') value = email(raw); if (key.toLowerCase().includes('phone')) value = phone(raw);
       values.push(value); return `${CONTACT_COLUMNS[key]}=$${values.length}`;
     });
-    const updated = await this.pool.query(`UPDATE crm_contacts SET ${sets.join(',')}, version=version+1, updated_at=now() WHERE id=$1 AND version=$2 AND deleted_at IS NULL RETURNING phone_e164,email,secondary_phone_e164`, values);
+    const provenance = Object.fromEntries(entries.map(([key]) => [key, { source: 'HUMAN', confirmedAt: new Date().toISOString(), actorId: actor.id }]));
+    values.push(JSON.stringify(provenance));
+    const updated = await this.pool.query(`UPDATE crm_contacts SET ${sets.join(',')}, field_provenance=field_provenance || $${values.length}::jsonb, version=version+1, updated_at=now() WHERE id=$1 AND version=$2 AND deleted_at IS NULL RETURNING phone_e164,email,secondary_phone_e164`, values);
     if (!updated.rowCount) { const error = new Error('El contacto cambió en otra sesión'); error.code = 'VERSION_CONFLICT'; throw error; }
     await this.#syncMethods(this.pool, id, updated.rows[0].phone_e164, updated.rows[0].email, updated.rows[0].secondary_phone_e164);
     await this.audit({ actor, action: 'CONTACT_UPDATED', entityType: 'contact', entityId: id, changes: patch, ...requestMeta });

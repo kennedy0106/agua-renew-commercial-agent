@@ -7,11 +7,14 @@ loadEnvironment();
 const integrationFiles = [
   'test/lead-postgres.integration.test.mjs',
   'test/postgres-persistence.integration.test.mjs',
+  'test/crm-authorization.integration.test.mjs',
+  'test/analysis-queue-postgres.integration.test.mjs',
+  'test/crm-provenance.integration.test.mjs',
 ];
 
 function runIntegration(connectionString) {
   return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, ['--test', ...integrationFiles], {
+    const child = spawn(process.execPath, ['--test', '--test-concurrency=1', ...integrationFiles], {
       env: { ...process.env, TEST_DATABASE_URL: connectionString },
       stdio: 'inherit',
     });
@@ -32,7 +35,8 @@ if (configuredTestUrl) {
     throw new Error('Configure TEST_DATABASE_URL o DATABASE_URL_UNPOOLED para ejecutar PostgreSQL de forma aislada.');
   }
   const adminUrl = new URL(adminConnectionString);
-  if (adminUrl.hostname.includes('-pooler') || adminUrl.searchParams.get('sslmode') !== 'verify-full') {
+  const localAdmin = ['localhost','127.0.0.1','::1'].includes(adminUrl.hostname);
+  if (adminUrl.hostname.includes('-pooler') || (!localAdmin && adminUrl.searchParams.get('sslmode') !== 'verify-full')) {
     throw new Error('DATABASE_URL_UNPOOLED debe usar el endpoint directo y sslmode=verify-full.');
   }
 

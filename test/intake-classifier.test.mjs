@@ -51,6 +51,28 @@ test('determinístico: botellitas pequeñas no asume 625 ml', () => {
   assert.equal(result.extraction.modality, 'maquila');
 });
 
+test('determinístico: intención prevalece sobre datos extraídos', () => {
+  assert.equal(deterministicClassify('Somos una agencia, podemos manejar sus redes. Llámennos al 955623069').conversationType, 'service_provider');
+  assert.equal(deterministicClassify('Busco empleo, mi teléfono es 955623069').conversationType, 'employment_or_job');
+  assert.equal(deterministicClassify('Tengo un reclamo por un bidón de 20 L').conversationType, 'support_or_complaint');
+  assert.equal(deterministicClassify('Tengo una agencia y quiero botellas con mi logo').conversationType, 'commercial_lead');
+  assert.equal(deterministicClassify('955623069').conversationType, 'unclear');
+});
+
+test('determinístico: 625 exige contexto de presentación y no sale de un teléfono', () => {
+  assert.equal(deterministicClassify('Mi teléfono es 962512345').extraction.product, null);
+  assert.equal(deterministicClassify('Mi celular es 900 625 001').extraction.product, null);
+  assert.equal(deterministicClassify('Mi código de referencia es 625').extraction.product, null);
+  assert.equal(deterministicClassify('Quiero botellas de 625 ml').extraction.product, '625ml');
+});
+
+test('determinístico: verbos generales no cambian la dirección de la intención',()=>{
+  assert.equal(deterministicClassify('Quiero ofrecerles manejo de redes sociales. Mi número es 900111222.').conversationType,'service_provider');
+  assert.equal(deterministicClassify('Quiero postular a una vacante. Mi número es 900111222.').conversationType,'employment_or_job');
+  assert.equal(deterministicClassify('Necesito trabajo.').conversationType,'employment_or_job');
+  assert.equal(deterministicClassify('Tengo un reclamo por el bidón de 20 L.').conversationType,'support_or_complaint');
+});
+
 test('IA: salida JSON estructurada se normaliza y valida', async () => {
   const provider = new FakeAIProvider([{
     conversation_type: 'commercial_lead', confidence: 1.5, reason_code: 'asks_price',

@@ -54,6 +54,11 @@ export class LeadProcessor {
   }
 
   async process(leadId) {
+    const prepared = await this.prepare(leadId);
+    return this.applyPrepared(prepared);
+  }
+
+  async prepare(leadId) {
     const analysis = await this.analyze(leadId);
     const { lead, patch, inboundCount } = analysis;
     const processedAt = this.clock();
@@ -66,6 +71,10 @@ export class LeadProcessor {
       return key === 'lastProcessedAt' || (previous ?? null) !== (next ?? null);
     }));
 
+    return { leadId, lead, patch, inboundCount, before, changes };
+  }
+
+  async applyPrepared({ leadId, lead, patch, inboundCount, before, changes }) {
     if (patch.phoneE164 && patch.phoneE164 !== lead.phoneE164) {
       await this.repository.recordPhoneHistory({
         leadId,
@@ -126,7 +135,7 @@ export class LeadProcessor {
       confidence = Math.max(confidence, 0.95);
     }
 
-    if (phoneE164 || product || modality) {
+    if ((product || modality) && !NON_LEADS.has(conversationType)) {
       conversationType = 'commercial_lead';
       confidence = Math.max(confidence, 0.8);
     }

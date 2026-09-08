@@ -8,13 +8,14 @@ process.on('unhandledRejection', (reason) => { console.error('[servidor] unhandl
 process.on('uncaughtException', (err) => { console.error('[servidor] uncaughtException:', err?.message ?? err); process.exit(1); });
 import { fileURLToPath } from 'node:url';
 
-import { aiConfigurationFromEnvironment, loadEnvironment } from '../../src/config/environment.mjs';
+import { aiConfigurationFromEnvironment, loadEnvironment, validateObserverConfiguration } from '../../src/config/environment.mjs';
 import { PostgresLeadRepository } from '../../src/leads/postgres-lead-repository.mjs';
 import { InMemoryLeadRepository } from '../../src/leads/in-memory-lead-repository.mjs';
 import { ObserverLeadService } from '../../src/leads/observer-lead-service.mjs';
 import { MetaWebhookHandler } from '../../src/meta/meta-webhook-handler.mjs';
 import { ConversationObserver } from '../../src/meta/conversation-observer.mjs';
 import { LeadProcessor } from '../../src/meta/lead-processor.mjs';
+import { AnalysisWorker } from '../../src/meta/analysis-worker.mjs';
 import { LeadsApi } from '../../src/admin/leads-api.mjs';
 import { syncConversations } from '../../src/meta/conversation-sync.mjs';
 import { AdminAuth } from '../../src/admin/admin-auth.mjs';
@@ -26,6 +27,7 @@ import { OpenAICompatibleProvider } from '../../src/ai/deepseek-provider.mjs';
 import { IntakeClassifier } from '../../src/ai/intake-classifier.mjs';
 
 loadEnvironment();
+validateObserverConfiguration();
 
 const appDirectory = fileURLToPath(new URL('.', import.meta.url));
 const publicDirectory = join(appDirectory, 'public');
@@ -33,18 +35,12 @@ const crmPublicDirectory = join(appDirectory, '../crm/dist');
 const port = Number(process.env.PORT ?? process.env.PORT_META ?? 4000);
 const host = process.env.HOST ?? '0.0.0.0';
 const connectionString = process.env.DATABASE_URL;
-const verifyToken = process.env.META_VERIFY_TOKEN ?? 'agua-renew-dev';
+const verifyToken = process.env.META_VERIFY_TOKEN ?? (process.env.NODE_ENV === 'production' ? null : 'agua-renew-dev');
 const appSecret = process.env.META_APP_SECRET ?? null;
 const pageAccessToken = process.env.META_PAGE_ACCESS_TOKEN ?? null;
 const adminToken = process.env.ADMIN_API_TOKEN ?? null;
 const production = process.env.NODE_ENV === 'production';
 const trustProxy = process.env.TRUST_PROXY === 'true';
-if (production && String(adminToken ?? '').length < 32) {
-  throw new Error('En producción ADMIN_API_TOKEN debe tener al menos 32 caracteres.');
-}
-if (production && connectionString && new URL(connectionString).searchParams.get('sslmode') !== 'verify-full') {
-  throw new Error('En producción DATABASE_URL debe configurar sslmode=verify-full.');
-}
 const adminAuth = new AdminAuth({ secret: adminToken, secure: production });
 
 const mimeTypes = {
@@ -147,7 +143,7 @@ function isAuthenticated(request) {
 }
 
 async function verifySchema(pool) {
-  const result = await pool.query("SELECT 1 FROM schema_migrations WHERE filename = '021_lead_ai_analysis.sql'");
+  const result = await pool.query("SELECT 1 FROM schema_migrations WHERE filename = '023_analysis_lease_and_coverage.sql'");
   if (!result.rowCount) {
     const error = new Error('Esquema desactualizado: ejecute npm run migrate con DATABASE_URL_UNPOOLED.');
     error.code = 'SCHEMA_OUTDATED';
@@ -192,8 +188,17 @@ async function main() {
   }
   const processor = new LeadProcessor({ repository, classifier });
   const observer = new ConversationObserver({ repository, processor });
+  const analysisWorker = new AnalysisWorker({ repository, processor });
+  const analysisActiveMs=Number(process.env.ANALYSIS_WORKER_ACTIVE_MS??5000);
+  const analysisIdleMs=Number(process.env.ANALYSIS_WORKER_IDLE_MS??300000);
+  let analysisTimer=null;
+  const scheduleAnalysis=(delay=0)=>{if(analysisTimer)clearTimeout(analysisTimer);analysisTimer=setTimeout(async()=>{
+    try{const result=await analysisWorker.runOnce();scheduleAnalysis(result.claimed?analysisActiveMs:analysisIdleMs);}
+    catch(error){console.warn('[lead-analysis]',error.message);scheduleAnalysis(analysisIdleMs);}
+  },delay);analysisTimer.unref();};
+  scheduleAnalysis(0);
   const leadService = new ObserverLeadService({ repository });
-  const webhookHandler = new MetaWebhookHandler({ verifyToken, appSecret, observer, repository, deferProcessing: true });
+  const webhookHandler = new MetaWebhookHandler({ verifyToken, appSecret, requireSignature: production, observer, repository, deferProcessing: true });
   const leadsApi = new LeadsApi({ leadService, repository, adminToken });
   let crmAuth = null;
   let crmRepository = null;
@@ -213,7 +218,7 @@ async function main() {
     }
     await crmRepository.ensureLeadMirror();
     await crmRepository.assignUnownedRoundRobin();
-    setInterval(() => crmRepository.runRevenueAutomations().catch((error) => console.warn('[crm-automation]', error.message)), 60_000).unref();
+    setInterval(() => crmRepository.runRevenueAutomations().catch((error) => console.warn('[crm-automation]', error.message)), Number(process.env.CRM_AUTOMATION_INTERVAL_MS??300000)).unref();
   }
 
   // Sincronización automática de conversaciones no leídas (solo lectura, no marca leído).
@@ -244,6 +249,7 @@ async function main() {
         sources: [...total.sources, current],
       }), { conversations: 0, leadsCreated: 0, messagesImported: 0, messagesSkipped: 0, sources: [] });
       lastSync = new Date().toISOString();
+      if (summary.messagesImported) scheduleAnalysis(0);
       lastSyncError = null;
       console.log('[auto-sync]', reason, JSON.stringify(summary));
       return summary;
@@ -278,6 +284,7 @@ async function main() {
         const signature = request.headers['x-hub-signature-256'];
         const summary = await webhookHandler.handle({ rawBody, signature });
         if (summary.error) return sendJson(response, 403, { error: summary.error });
+        if (summary.processed || summary.duplicates) scheduleAnalysis(0);
         console.log('[webhook]', JSON.stringify(summary));
         return sendJson(response, 200, summary);
       }

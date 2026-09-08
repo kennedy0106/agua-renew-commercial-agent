@@ -3,6 +3,7 @@ import test from 'node:test';
 import { InMemoryLeadRepository } from '../src/leads/in-memory-lead-repository.mjs';
 import { LeadProcessor } from '../src/meta/lead-processor.mjs';
 import { ConversationObserver } from '../src/meta/conversation-observer.mjs';
+import { AnalysisWorker } from '../src/meta/analysis-worker.mjs';
 import { ObserverLeadService } from '../src/leads/observer-lead-service.mjs';
 import { LeadsApi } from '../src/admin/leads-api.mjs';
 
@@ -87,7 +88,7 @@ test('observer puede confirmar el webhook antes de terminar el análisis de IA',
   assert.equal(observed.deferred, true);
   assert.equal(observed.lead.processingVersion, null);
   release();
-  await new Promise((resolve) => setTimeout(resolve, 10));
+  await new AnalysisWorker({ repository, processor: observer.processor }).runOnce();
   const processed = await repository.findLeadById(observed.lead.id);
   assert.equal(processed.analysisSource, 'ai');
   assert.equal(processed.product, '20l');
@@ -121,4 +122,19 @@ test('corrección manual completa el lead sin escribir en Meta', async () => {
   const lead = await repository.findLeadById(observed.lead.id);
   assert.equal(lead.status, 'READY_FOR_WHATSAPP');
   assert.equal((await repository.listMessages(lead.id)).length, 1);
+});
+
+test('processor acumulativo conserva intención fundamentada y solo toma teléfonos entrantes',async()=>{
+  const {observer,repository}=setup();const base={channel:'instagram',sourceConversationId:'intent-series',actorType:'user'};
+  let result=await observer.observe({...base,direction:'inbound',externalMessageId:'is1',text:'Quiero ofrecerles manejo de redes sociales.'});
+  result=await observer.observe({...base,direction:'inbound',externalMessageId:'is2',text:'Mi celular es 900 625 001'});
+  await observer.observe({...base,direction:'outbound',actorType:'meta_business_agent',externalMessageId:'is3',text:'Nuestro teléfono es 955623069'});
+  const lead=await repository.findLeadById(result.lead.id);assert.equal(lead.conversationType,'service_provider');assert.equal(lead.phoneE164,'+51900625001');assert.equal(lead.product,null);
+});
+
+test('processor acumulativo completa una compra ya establecida con teléfono posterior',async()=>{
+  const {observer}=setup();const base={channel:'instagram',sourceConversationId:'buy-series',direction:'inbound',actorType:'user'};
+  await observer.observe({...base,externalMessageId:'bs1',text:'Quiero botellas de 625 ml con mi marca'});
+  const result=await observer.observe({...base,externalMessageId:'bs2',text:'Mi teléfono es 900111222'});
+  assert.equal(result.lead.conversationType,'commercial_lead');assert.equal(result.lead.status,'READY_FOR_WHATSAPP');
 });

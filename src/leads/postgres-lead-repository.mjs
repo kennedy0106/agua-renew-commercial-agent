@@ -83,10 +83,11 @@ function mapLead(row) {
 
 /** Adaptador PostgreSQL para leads (compatible con local y Neon). */
 export class PostgresLeadRepository extends LeadRepository {
-  constructor({ connectionString }) {
+  constructor({ connectionString, faultInjector = null }) {
     super();
     this.connectionString = connectionString;
     this.pool = null;
+    this.faultInjector = faultInjector;
   }
 
   async connect() {
@@ -162,7 +163,10 @@ export class PostgresLeadRepository extends LeadRepository {
   async appendMessage({ leadId, channel, direction, actorType = null, actorId = null, externalMessageId = null, content,
     deliveryStatus = direction === 'inbound' ? 'RECEIVED' : 'PENDING', purpose = null,
     providerMessageId = null, sourceCreatedAt = null }) {
-    const result = await this.pool.query(
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await client.query(
       `INSERT INTO lead_messages
         (lead_id, channel, direction, actor_type, actor_id, external_message_id, content,
          delivery_status, purpose, provider_message_id, source_created_at, next_attempt_at, sent_at)
@@ -176,7 +180,64 @@ export class PostgresLeadRepository extends LeadRepository {
       [leadId, channel, direction, actorType, actorId, externalMessageId, content,
         deliveryStatus, purpose, providerMessageId, sourceCreatedAt],
     );
-    return result.rows[0] ? mapMessage(result.rows[0]) : null;
+      if (direction === 'inbound') {
+        await this.faultInjector?.('after_message_write');
+        const row=result.rows[0];
+        if (row.analysis_version === null) {
+          await client.query(`INSERT INTO lead_analysis_jobs(lead_id,requested_version,completed_version,status) VALUES($1,0,0,'PENDING') ON CONFLICT DO NOTHING`,[leadId]);
+          const job=(await client.query('SELECT * FROM lead_analysis_jobs WHERE lead_id=$1 FOR UPDATE',[leadId])).rows[0];
+          const next=Number(job.requested_version)+1;
+          await client.query(`UPDATE lead_analysis_jobs SET requested_version=$2,status=CASE WHEN status='PROCESSING' THEN status ELSE 'PENDING' END,
+            next_attempt_at=CASE WHEN status='PROCESSING' THEN next_attempt_at ELSE now() END,
+            attempt_count=CASE WHEN status='EXHAUSTED' THEN 0 ELSE attempt_count END,updated_at=now() WHERE lead_id=$1`,[leadId,next]);
+          await client.query('UPDATE lead_messages SET analysis_version=$2 WHERE id=$1',[row.id,next]); row.analysis_version=next;
+        } else {
+          await client.query(`INSERT INTO lead_analysis_jobs(lead_id,requested_version,completed_version,status,next_attempt_at)
+            SELECT $1,$2::bigint,CASE WHEN last_processed_at IS NULL THEN 0::bigint ELSE $2::bigint END,'PENDING',
+              CASE WHEN last_processed_at IS NULL THEN now() ELSE 'infinity'::timestamptz END FROM leads WHERE id=$1 ON CONFLICT DO NOTHING`,[leadId,row.analysis_version]);
+        }
+      }
+      await client.query('COMMIT'); return result.rows[0] ? mapMessage(result.rows[0]) : null;
+    } catch(error){await client.query('ROLLBACK');throw error;} finally{client.release();}
+  }
+
+  async claimAnalysisJobs({ limit = 10, leaseMs = 120_000 } = {}) {
+    const client = await this.pool.connect();
+    try { await client.query('BEGIN');
+      await client.query(`UPDATE lead_analysis_jobs SET status='FAILED',next_attempt_at=now(),locked_at=NULL,updated_at=now()
+        WHERE status='PROCESSING' AND locked_at < now()-($1::int*interval '1 millisecond')`,[leaseMs]);
+      const result = await client.query(`WITH due AS (SELECT lead_id FROM lead_analysis_jobs
+        WHERE status IN ('PENDING','FAILED') AND next_attempt_at<=now() ORDER BY next_attempt_at FOR UPDATE SKIP LOCKED LIMIT $1)
+        UPDATE lead_analysis_jobs j SET status='PROCESSING',attempt_count=attempt_count+1,locked_at=now(),lease_token=gen_random_uuid(),updated_at=now()
+        FROM due WHERE j.lead_id=due.lead_id RETURNING j.lead_id AS "leadId",j.requested_version AS "requestedVersion",j.attempt_count AS "attemptCount",j.lease_token AS "leaseToken"`,[limit]);
+      await client.query('COMMIT'); return result.rows;
+    } catch(error){await client.query('ROLLBACK');throw error;} finally{client.release();}
+  }
+
+  async failAnalysisJob(job, { nextAttemptAt, error, maxAttempts = 5 }) {
+    const result=await this.pool.query(`UPDATE lead_analysis_jobs SET status=CASE WHEN attempt_count >= $4 THEN 'EXHAUSTED' ELSE 'FAILED' END,
+      next_attempt_at=$3,locked_at=NULL,lease_token=NULL,last_error=$5,updated_at=now()
+      WHERE lead_id=$1 AND requested_version=$2 AND lease_token=$6 AND status='PROCESSING' RETURNING lead_id`,
+    [job.leadId,job.requestedVersion,nextAttemptAt,maxAttempts,String(error??'').slice(0,500),job.leaseToken]); return Boolean(result.rowCount);
+  }
+
+  async applyAnalysisJobResult(job, prepared) {
+    const client=await this.pool.connect();
+    try { await client.query('BEGIN');
+      const locked=await client.query(`SELECT * FROM lead_analysis_jobs WHERE lead_id=$1 AND status='PROCESSING' AND lease_token=$2 FOR UPDATE`,[job.leadId,job.leaseToken]);
+      if(!locked.rowCount){await client.query('ROLLBACK');return {applied:false,reason:'lease_lost'};}
+      const current=locked.rows[0];
+      if(Number(current.requested_version)!==Number(job.requestedVersion)){
+        await client.query(`UPDATE lead_analysis_jobs SET completed_version=GREATEST(completed_version,$2),status='PENDING',next_attempt_at=now(),locked_at=NULL,lease_token=NULL,updated_at=now() WHERE lead_id=$1`,[job.leadId,job.requestedVersion]);
+        await client.query('COMMIT'); return {applied:false,reason:'newer_version_pending'};
+      }
+      const entries=Object.entries(prepared.patch); const sets=entries.map(([key],i)=>`${LEAD_COLUMNS[key]}=$${i+2}`);
+      const updated=await client.query(`UPDATE leads SET ${sets.join(',')},updated_at=now() WHERE id=$1 RETURNING *`,[job.leadId,...entries.map(([,v])=>v)]);
+      if(prepared.patch.phoneE164&&prepared.patch.phoneE164!==prepared.lead.phoneE164) await client.query(`INSERT INTO lead_phone_history(lead_id,previous_phone,new_phone,reason) VALUES($1,$2,$3,$4)`,[job.leadId,prepared.lead.phoneE164,prepared.patch.phoneE164,prepared.lead.phoneE164?'PHONE_UPDATED_FROM_CONVERSATION':'PHONE_CAPTURED']);
+      await client.query(`INSERT INTO lead_events(lead_id,event_type,payload) VALUES($1,'LEAD_PROCESSED',$2::jsonb)`,[job.leadId,JSON.stringify({version:prepared.patch.processingVersion,messageCount:prepared.inboundCount,changes:Object.keys(prepared.changes).filter(k=>k!=='lastProcessedAt'),previousStatus:prepared.before.status,status:prepared.patch.status})]);
+      await client.query(`UPDATE lead_analysis_jobs SET completed_version=$2,status='PENDING',next_attempt_at='infinity'::timestamptz,attempt_count=0,locked_at=NULL,lease_token=NULL,last_error=NULL,updated_at=now() WHERE lead_id=$1`,[job.leadId,job.requestedVersion]);
+      await client.query('COMMIT'); return {applied:true,lead:mapLead(updated.rows[0])};
+    } catch(error){await client.query('ROLLBACK');throw error;} finally{client.release();}
   }
 
   async listMessages(leadId) {
@@ -508,6 +569,7 @@ function mapMessage(row) {
     lastErrorMessage: row.last_error_message,
     sourceCreatedAt: row.source_created_at ? new Date(row.source_created_at).toISOString() : null,
     lockedAt: row.locked_at ? new Date(row.locked_at).toISOString() : null,
+    analysisVersion: row.analysis_version === null || row.analysis_version === undefined ? null : Number(row.analysis_version),
     wasInserted: row.was_inserted === undefined ? undefined : row.was_inserted === true,
   };
 }

@@ -98,8 +98,8 @@ export class CrmRepository {
        SELECT $1, l.id, COALESCE(NULLIF(btrim(l.meta_username), ''), 'Prospecto de Meta'),
               l.phone_e164, l.source_channel, l.source_conversation_id, l.created_at, l.updated_at
        FROM leads l ON CONFLICT (source_lead_id) DO UPDATE SET
-         display_name = EXCLUDED.display_name,
-         phone_e164 = COALESCE(EXCLUDED.phone_e164, crm_contacts.phone_e164),
+         display_name = CASE WHEN crm_contacts.field_provenance ? 'displayName' THEN crm_contacts.display_name ELSE EXCLUDED.display_name END,
+         phone_e164 = CASE WHEN crm_contacts.field_provenance ? 'phoneE164' THEN crm_contacts.phone_e164 ELSE COALESCE(EXCLUDED.phone_e164, crm_contacts.phone_e164) END,
          updated_at = GREATEST(EXCLUDED.updated_at, crm_contacts.updated_at)`,
       [ORGANIZATION_ID],
     );
@@ -112,7 +112,8 @@ export class CrmRepository {
        SELECT $1, l.id, c.id, $2,
          CASE
            WHEN l.status = 'READY_FOR_WHATSAPP' THEN $3::uuid
-           WHEN l.status IN ('CONTACT_OPENED','CONTACTED_MANUALLY') THEN $4::uuid
+           WHEN l.status = 'CONTACTED_MANUALLY' THEN $4::uuid
+           WHEN l.status = 'CONTACT_OPENED' THEN $3::uuid
            WHEN l.status IN ('COLLECTING','WAITING_PHONE') THEN $5::uuid
            WHEN l.status = 'CLOSED' AND l.conversation_type = 'commercial_lead' THEN $6::uuid
            ELSE $7::uuid END,
@@ -123,11 +124,12 @@ export class CrmRepository {
            WHEN l.status = 'CLOSED' THEN 'LOST' ELSE 'OPEN' END,
          CASE WHEN l.status = 'CLOSED' THEN 'Cierre histórico importado' ELSE NULL END,
          CASE
-           WHEN l.status IN ('CONTACT_OPENED','CONTACTED_MANUALLY') THEN 'HANDED_OFF'
+           WHEN l.status = 'CONTACTED_MANUALLY' THEN 'HANDED_OFF'
+           WHEN l.status = 'CONTACT_OPENED' THEN 'READY'
            WHEN l.status = 'READY_FOR_WHATSAPP' AND l.phone_e164 IS NOT NULL THEN 'READY'
            WHEN l.status IN ('COLLECTING','WAITING_PHONE','WAITING_MODALITY') THEN 'NEEDS_DATA'
            ELSE 'UNREVIEWED' END,
-         CASE WHEN l.status='READY_FOR_WHATSAPP' THEN 'READY_TO_BUY'
+         CASE WHEN l.status='READY_FOR_WHATSAPP' THEN 'INTERESTED'
            WHEN l.conversation_type='commercial_lead' AND l.product IS NOT NULL AND l.modality IS NOT NULL THEN 'QUALIFIED'
            WHEN l.conversation_type='commercial_lead' OR l.product IS NOT NULL OR l.modality IS NOT NULL THEN 'INTERESTED'
            ELSE 'EXPLORING' END,
@@ -149,8 +151,8 @@ export class CrmRepository {
          l.created_at, l.updated_at
        FROM leads l JOIN crm_contacts c ON c.source_lead_id = l.id
        ON CONFLICT (source_lead_id) DO UPDATE SET
-         product = COALESCE(crm_opportunities.product, EXCLUDED.product),
-         modality = COALESCE(crm_opportunities.modality, EXCLUDED.modality),
+         product = CASE WHEN crm_opportunities.field_provenance ? 'product' THEN crm_opportunities.product ELSE COALESCE(EXCLUDED.product,crm_opportunities.product) END,
+         modality = CASE WHEN crm_opportunities.field_provenance ? 'modality' THEN crm_opportunities.modality ELSE COALESCE(EXCLUDED.modality,crm_opportunities.modality) END,
          lifecycle_status = CASE
            WHEN crm_opportunities.classification_source='HUMAN' OR crm_opportunities.lifecycle_status IN ('WON','LOST') THEN crm_opportunities.lifecycle_status
            WHEN EXCLUDED.lifecycle_status='ARCHIVED' THEN 'ARCHIVED'
@@ -176,6 +178,13 @@ export class CrmRepository {
          last_meta_message_at = GREATEST(crm_opportunities.last_meta_message_at,EXCLUDED.last_meta_message_at)`,
       [ORGANIZATION_ID, PIPELINE_ID, STAGE_IDS.READY_WHATSAPP, STAGE_IDS.CONTACTED, STAGE_IDS.QUALIFICATION, STAGE_IDS.LOST, STAGE_IDS.NEW],
     );
+    await this.pool.query(`INSERT INTO crm_data_conflicts (organization_id,entity_type,entity_id,field_name,canonical_value,observed_value)
+      SELECT $1,'contact',c.id,'phoneE164',c.phone_e164,l.phone_e164 FROM crm_contacts c JOIN leads l ON l.id=c.source_lead_id
+      WHERE c.field_provenance ? 'phoneE164' AND l.phone_e164 IS NOT NULL AND c.phone_e164 IS DISTINCT FROM l.phone_e164 ON CONFLICT DO NOTHING`, [ORGANIZATION_ID]);
+    await this.pool.query(`INSERT INTO crm_data_conflicts (organization_id,entity_type,entity_id,field_name,canonical_value,observed_value)
+      SELECT $1,'opportunity',o.id,v.field_name,v.canonical_value,v.observed_value FROM crm_opportunities o JOIN leads l ON l.id=o.source_lead_id
+      CROSS JOIN LATERAL (VALUES ('product',o.product,l.product),('modality',o.modality,l.modality)) v(field_name,canonical_value,observed_value)
+      WHERE o.field_provenance ? v.field_name AND v.observed_value IS NOT NULL AND v.canonical_value IS DISTINCT FROM v.observed_value ON CONFLICT DO NOTHING`, [ORGANIZATION_ID]);
   }
 
   async assignUnownedRoundRobin() {
@@ -488,6 +497,11 @@ export class CrmRepository {
     if (actor.role === 'ADVISOR' && entries.some(([key]) => key === 'ownerId')) throw new Error('No autorizado');
     const values = [id, Number(version)];
     const sets = entries.map(([key, value]) => { values.push(value === '' ? null : value); return `${allowed[key]} = $${values.length}`; });
+    const protectedFields = entries.filter(([key]) => ['product','modality'].includes(key));
+    if (protectedFields.length) {
+      values.push(JSON.stringify(Object.fromEntries(protectedFields.map(([key]) => [key,{source:'HUMAN',confirmedAt:new Date().toISOString(),actorId:actor.id}]))));
+      sets.push(`field_provenance=field_provenance || $${values.length}::jsonb`);
+    }
     const ownerRestriction = actor.role === 'ADVISOR' ? `AND owner_id = $${values.push(actor.id)}` : '';
     const result = await this.pool.query(
       `UPDATE crm_opportunities SET ${sets.join(', ')}, version = version + 1, updated_at = now()
