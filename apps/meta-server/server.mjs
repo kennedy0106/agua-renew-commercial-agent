@@ -143,7 +143,7 @@ function isAuthenticated(request) {
 }
 
 async function verifySchema(pool) {
-  const result = await pool.query("SELECT 1 FROM schema_migrations WHERE filename = '022_observer_stabilization.sql'");
+  const result = await pool.query("SELECT 1 FROM schema_migrations WHERE filename = '023_analysis_lease_and_coverage.sql'");
   if (!result.rowCount) {
     const error = new Error('Esquema desactualizado: ejecute npm run migrate con DATABASE_URL_UNPOOLED.');
     error.code = 'SCHEMA_OUTDATED';
@@ -189,8 +189,14 @@ async function main() {
   const processor = new LeadProcessor({ repository, classifier });
   const observer = new ConversationObserver({ repository, processor });
   const analysisWorker = new AnalysisWorker({ repository, processor });
-  analysisWorker.runOnce().catch((error) => console.warn('[lead-analysis]', error.message));
-  setInterval(() => analysisWorker.runOnce().catch((error) => console.warn('[lead-analysis]', error.message)), Number(process.env.ANALYSIS_WORKER_INTERVAL_MS ?? 30000)).unref();
+  const analysisActiveMs=Number(process.env.ANALYSIS_WORKER_ACTIVE_MS??5000);
+  const analysisIdleMs=Number(process.env.ANALYSIS_WORKER_IDLE_MS??300000);
+  let analysisTimer=null;
+  const scheduleAnalysis=(delay=0)=>{if(analysisTimer)clearTimeout(analysisTimer);analysisTimer=setTimeout(async()=>{
+    try{const result=await analysisWorker.runOnce();scheduleAnalysis(result.claimed?analysisActiveMs:analysisIdleMs);}
+    catch(error){console.warn('[lead-analysis]',error.message);scheduleAnalysis(analysisIdleMs);}
+  },delay);analysisTimer.unref();};
+  scheduleAnalysis(0);
   const leadService = new ObserverLeadService({ repository });
   const webhookHandler = new MetaWebhookHandler({ verifyToken, appSecret, requireSignature: production, observer, repository, deferProcessing: true });
   const leadsApi = new LeadsApi({ leadService, repository, adminToken });
@@ -212,7 +218,7 @@ async function main() {
     }
     await crmRepository.ensureLeadMirror();
     await crmRepository.assignUnownedRoundRobin();
-    setInterval(() => crmRepository.runRevenueAutomations().catch((error) => console.warn('[crm-automation]', error.message)), 60_000).unref();
+    setInterval(() => crmRepository.runRevenueAutomations().catch((error) => console.warn('[crm-automation]', error.message)), Number(process.env.CRM_AUTOMATION_INTERVAL_MS??300000)).unref();
   }
 
   // Sincronización automática de conversaciones no leídas (solo lectura, no marca leído).
@@ -243,6 +249,7 @@ async function main() {
         sources: [...total.sources, current],
       }), { conversations: 0, leadsCreated: 0, messagesImported: 0, messagesSkipped: 0, sources: [] });
       lastSync = new Date().toISOString();
+      if (summary.messagesImported) scheduleAnalysis(0);
       lastSyncError = null;
       console.log('[auto-sync]', reason, JSON.stringify(summary));
       return summary;
@@ -277,6 +284,7 @@ async function main() {
         const signature = request.headers['x-hub-signature-256'];
         const summary = await webhookHandler.handle({ rawBody, signature });
         if (summary.error) return sendJson(response, 403, { error: summary.error });
+        if (summary.processed || summary.duplicates) scheduleAnalysis(0);
         console.log('[webhook]', JSON.stringify(summary));
         return sendJson(response, 200, summary);
       }

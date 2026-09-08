@@ -61,7 +61,16 @@ test('determinístico: intención prevalece sobre datos extraídos', () => {
 
 test('determinístico: 625 exige contexto de presentación y no sale de un teléfono', () => {
   assert.equal(deterministicClassify('Mi teléfono es 962512345').extraction.product, null);
+  assert.equal(deterministicClassify('Mi celular es 900 625 001').extraction.product, null);
+  assert.equal(deterministicClassify('Mi código de referencia es 625').extraction.product, null);
   assert.equal(deterministicClassify('Quiero botellas de 625 ml').extraction.product, '625ml');
+});
+
+test('determinístico: verbos generales no cambian la dirección de la intención',()=>{
+  assert.equal(deterministicClassify('Quiero ofrecerles manejo de redes sociales. Mi número es 900111222.').conversationType,'service_provider');
+  assert.equal(deterministicClassify('Quiero postular a una vacante. Mi número es 900111222.').conversationType,'employment_or_job');
+  assert.equal(deterministicClassify('Necesito trabajo.').conversationType,'employment_or_job');
+  assert.equal(deterministicClassify('Tengo un reclamo por el bidón de 20 L.').conversationType,'support_or_complaint');
 });
 
 test('IA: salida JSON estructurada se normaliza y valida', async () => {

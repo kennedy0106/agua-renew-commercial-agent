@@ -51,7 +51,7 @@ La aplicación se conecta con `DATABASE_URL`. En Neon use una URL pooled (`-pool
 pnpm migrate
 ```
 
-Las migraciones están en `database/migrations/` (actualmente `001_…` a `022_…`) y son idempotentes. En producción el servidor exige `022_observer_stabilization.sql`, pero no ejecuta migraciones automáticamente.
+Las migraciones están en `database/migrations/` (actualmente `001_…` a `023_…`) y son idempotentes. En producción el servidor exige `023_analysis_lease_and_coverage.sql`, pero no ejecuta migraciones automáticamente.
 
 ## CRM comercial
 
@@ -147,7 +147,9 @@ pnpm mock:meta "Quiero 20 litros con mi marca, mi número es 955623069"
 
 En desarrollo, sin `DATABASE_URL` se usa memoria con una advertencia explícita. En producción `DATABASE_URL`, `META_APP_SECRET`, un `META_VERIFY_TOKEN` no predeterminado y `ADMIN_API_TOKEN` (mínimo 32 caracteres) son obligatorios; una base ausente/inaccesible detiene el proceso antes de escuchar. `META_PAGE_ACCESS_TOKEN` se usa solo para consultas GET de Messenger e Instagram.
 
-El análisis es determinístico por defecto. La IA solo se habilita con todas las variables `AI_*`; en producción `AI_BASE_URL` debe pertenecer a `AI_ALLOWED_BASE_URLS`. El observador ignora por completo `DEEPSEEK_*`, reservadas al simulador legacy. Cada mensaje entrante crea o versiona un trabajo en PostgreSQL; el worker recupera pendientes al arrancar, usa leases, hasta cinco intentos con backoff y consulta cada 30 segundos por defecto (`ANALYSIS_WORKER_INTERVAL_MS`).
+El análisis es determinístico por defecto. La IA solo se habilita con todas las variables `AI_*`; en producción `AI_BASE_URL` debe pertenecer a `AI_ALLOWED_BASE_URLS`. El observador ignora por completo `DEEPSEEK_*`, reservadas al simulador legacy. Mensaje y cobertura se guardan en una transacción; cada mensaje posee `analysis_version`. El worker reclama un solo trabajo con token de lease, calcula fuera de transacción y solo aplica si token y versión siguen vigentes.
+
+El worker despierta inmediatamente al arrancar o recibir/importar mensajes, revisa cada 5 segundos mientras encuentra trabajo y pasa a una revisión de seguridad cada 5 minutos sin actividad (`ANALYSIS_WORKER_ACTIVE_MS`/`ANALYSIS_WORKER_IDLE_MS`). Las automatizaciones CRM se revisan cada 5 minutos y la sincronización Meta conserva su intervalo configurable. Por ello, con sincronización Meta habilitada siguen existiendo consultas periódicas; no se garantiza suspensión de la base. Tras un reinicio la demora máxima normal de recuperación es el arranque del proceso; sin eventos, el control de seguridad puede tardar hasta el intervalo idle.
 
 Para analizar historiales importados sin enviar respuestas:
 

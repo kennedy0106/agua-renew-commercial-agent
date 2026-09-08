@@ -13,6 +13,7 @@ function fakePool(rows) {
     },
     end: async () => {},
   };
+  pool.connect = async () => ({ query: pool.query, release: () => {} });
   return { pool, calls };
 }
 
@@ -69,11 +70,20 @@ test('postgres deleteLead: confía en las FK ON DELETE CASCADE', async () => {
 
 test('postgres appendMessage: idempotente y actualiza metadatos de origen', async () => {
   const { pool, calls } = fakePool([]);
+  pool.query = async (text, params) => {
+    calls.push({ text, params });
+    if (text.includes('RETURNING *, (xmax = 0)')) {
+      return { rows: [{ id: 'message-1', sequence_no: 1, lead_id: 'lead-1', direction: 'inbound', analysis_version: 4, created_at: new Date() }] };
+    }
+    return { rows: [] };
+  };
+  pool.connect = async () => ({ query: pool.query, release: () => {} });
   const repo = new PostgresLeadRepository({ connectionString: 'postgres://x' });
   repo.pool = pool;
 
   const result = await repo.appendMessage({ leadId: 'lead-1', channel: 'facebook_messenger', direction: 'inbound', externalMessageId: 'mid-x', content: 'Hola' });
-  assert.equal(result, null);
-  assert.equal(calls.length, 1);
-  assert.match(calls[0].text, /ON CONFLICT \(external_message_id\).*DO UPDATE SET/s);
+  assert.equal(result.id, 'message-1');
+  assert.equal(result.analysisVersion, 4);
+  assert.equal(calls.length, 4);
+  assert.match(calls[1].text, /ON CONFLICT \(external_message_id\).*DO UPDATE SET/s);
 });

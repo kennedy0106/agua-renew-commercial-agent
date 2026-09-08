@@ -56,6 +56,7 @@ function clamp(value, min, max) {
 /** Clasificación determinística de respaldo (sin IA): reglas simples documentadas. */
 export function deterministicClassify(text = '') {
   const lower = ` ${text.toLowerCase()} `;
+  const withoutPhones = lower.replace(/(?:\+?51[\s.-]*)?9(?:[\s.-]*\d){8}/g, ' ');
   const extraction = {
     phone: normalizePhone(text),
     product: null,
@@ -64,7 +65,7 @@ export function deterministicClassify(text = '') {
 
   // Producto explícito (patrones canónicos con cantidad, no inferencias).
   if (/bid[oó]n/.test(lower) || /20\s*l/.test(lower)) extraction.product = '20l';
-  else if (/\b625\b(?:\s*(?:ml|mililitros?))?/.test(lower)) extraction.product = '625ml';
+  else if (/\b625\s*(?:ml|mililitros?)\b/.test(withoutPhones) || /botellas?\s+(?:de\s+)?625\b/.test(withoutPhones)) extraction.product = '625ml';
   else if (/galonera|10[\s.,]?5\s*l/.test(lower)) extraction.product = '10_5l';
   else if (/\b1\s*l\b|\b1\s*litro\b/.test(lower)) extraction.product = '1l';
 
@@ -77,20 +78,20 @@ export function deterministicClassify(text = '') {
     extraction.modality = 'final_customer';
   }
 
-  const hasCommercialContext = Boolean(extraction.product || extraction.modality || /\b(?:comprar|quiero|cotiz|precio|pedido|necesito|vender\s+agua)\b/.test(lower));
+  const hasCommercialContext = Boolean(extraction.product || extraction.modality || /(?:comprar|cotiz|precio|pedido|necesito|quiero).{0,40}(?:agua|bid[oó]n|botellas?|galonera|maquila|marca\s+propia)/.test(lower));
 
   if (hasClearlyForeignBusinessContext(text)) {
     return { conversationType: 'spam_or_irrelevant', confidence: 0.95, reasonCode: 'foreign_business_context', offeringServicesToRenew: false, extraction: { phone: null, product: null, modality: null }, analysisSource: 'deterministic' };
   }
 
   // Proveedor que ofrece servicios (requiere oferta explícita, no solo mencionar el rubro).
-  if (!hasCommercialContext && /ofrecem|podemos\s*(manejar|gestionar|ayudarles)|manejo\s*de\s*(sus\s*)?redes|administraci[oó]n\s*de\s*redes|agencia\s*de\s*(marketing|publicidad|campañas)|vender(le|les)?\s*servicios/.test(lower)) {
+  if (!hasCommercialContext && /ofrecem|ofrecerles|podemos\s*(manejar|gestionar|ayudarles)|manejo\s*de\s*(sus\s*)?redes|administraci[oó]n\s*de\s*redes|agencia\s*de\s*(marketing|publicidad|campañas)|vender(le|les)?\s*(?:publicidad|servicios)/.test(lower)) {
     return { conversationType: 'service_provider', confidence: 0.7, reasonCode: 'offers_service_to_renew', offeringServicesToRenew: true, extraction, analysisSource: 'deterministic' };
   }
   if (!hasCommercialContext && /gana\s*(miles|dinero)|premio|clic\s*aqu[ií]|www\.|incre[ií]ble\s*oferta|pr[eé]stamo/.test(lower)) {
     return { conversationType: 'spam_or_irrelevant', confidence: 0.8, reasonCode: 'spam_pattern', offeringServicesToRenew: false, extraction, analysisSource: 'deterministic' };
   }
-  if (!hasCommercialContext && /busco\s*trabajo|vacante|curr[ií]culum|curriculum|empleo|practicante/.test(lower)) {
+  if (/busco\s*trabajo|necesito\s*trabajo|postular.{0,20}vacante|vacante|curr[ií]culum|curriculum|empleo|practicante/.test(lower)) {
     return { conversationType: 'employment_or_job', confidence: 0.8, reasonCode: 'seeks_job', offeringServicesToRenew: false, extraction, analysisSource: 'deterministic' };
   }
   if (/reclamo|queja|no\s*me\s*(lleg[oó]|funciona)|soporte|devoluci[oó]n/.test(lower)) {

@@ -8,11 +8,13 @@ const integrationFiles = [
   'test/lead-postgres.integration.test.mjs',
   'test/postgres-persistence.integration.test.mjs',
   'test/crm-authorization.integration.test.mjs',
+  'test/analysis-queue-postgres.integration.test.mjs',
+  'test/crm-provenance.integration.test.mjs',
 ];
 
 function runIntegration(connectionString) {
   return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, ['--test', ...integrationFiles], {
+    const child = spawn(process.execPath, ['--test', '--test-concurrency=1', ...integrationFiles], {
       env: { ...process.env, TEST_DATABASE_URL: connectionString },
       stdio: 'inherit',
     });

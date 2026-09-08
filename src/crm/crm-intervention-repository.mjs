@@ -119,7 +119,8 @@ export class CrmInterventionRepository extends CrmRevenueRepository {
     const qualificationStatus = String(input.qualificationStatus ?? 'NEEDS_DATA').toUpperCase();
     const intentLevel = String(input.intentLevel ?? 'EXPLORING').toUpperCase();
     const dataQuality = String(input.dataQuality ?? 'INSUFFICIENT').toUpperCase();
-    const product = clean(input.product); const modality = clean(input.modality);
+    let product = clean(input.product); let modality = clean(input.modality);
+    const productProvided = Object.hasOwn(input, 'product'); const modalityProvided = Object.hasOwn(input, 'modality');
     if (!QUALIFICATION.has(qualificationStatus) || qualificationStatus === 'HANDED_OFF') throw new Error('Estado de calificación inválido');
     if (!INTENT.has(intentLevel) || !DATA_QUALITY.has(dataQuality)) throw new Error('Clasificación inválida');
     if (product && !PRODUCTS.has(product)) throw new Error('Producto inválido');
@@ -134,10 +135,17 @@ export class CrmInterventionRepository extends CrmRevenueRepository {
       const row = current.rows[0];
       if (actor.role === 'ADVISOR' && row.owner_id !== actor.id) throw new Error('No autorizado: debe asumir la oportunidad antes de modificarla');
       if (Number(row.version) !== Number(version)) throw conflict('La clasificación cambió en otra sesión');
+      if (!productProvided) product = row.product;
+      if (!modalityProvided) modality = row.modality;
       if (qualificationStatus==='READY' && (!row.phone_e164 || !product || !modality)) throw new Error('Para dejar listo para WhatsApp confirme teléfono, producto y modalidad');
+      const provenance = {};
+      const confirmedAt = new Date().toISOString();
+      if (productProvided) provenance.product={source:'HUMAN',confirmedAt,actorId:actor.id};
+      if (modalityProvided) provenance.modality={source:'HUMAN',confirmedAt,actorId:actor.id};
       await client.query(`UPDATE crm_opportunities SET product=$2,modality=$3,qualification_status=$4,intent_level=$5,data_quality=$6,
-        priority_score=$7,automation_summary=$8,review_reason=$9,classification_source='HUMAN',classified_at=now(),version=version+1,updated_at=now()
-        WHERE id=$1`, [id,product,modality,qualificationStatus,intentLevel,dataQuality,priorityScore,clean(input.summary),clean(input.reviewReason)]);
+        priority_score=$7,automation_summary=$8,review_reason=$9,field_provenance=field_provenance || $10::jsonb,
+        classification_source='HUMAN',classified_at=now(),version=version+1,updated_at=now()
+        WHERE id=$1`, [id,product,modality,qualificationStatus,intentLevel,dataQuality,priorityScore,clean(input.summary),clean(input.reviewReason),JSON.stringify(provenance)]);
       await audit(client,actor,'OPPORTUNITY_QUALIFIED',id,{qualificationStatus,intentLevel,dataQuality,priorityScore,product,modality},requestMeta);
       await client.query('COMMIT');
       return this.findOpportunity(id, actor);

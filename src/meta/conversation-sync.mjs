@@ -70,6 +70,7 @@ export async function syncConversations({ repository, observer, pageId, business
           text: String(message.message ?? '').trim() ? message.message : attachmentLabel,
           timestamp: sourceCreatedAt,
           skipProcessing: !String(message.message ?? '').trim(),
+          deferProcessing: true,
         });
         if (observed.created && !lead) leadsCreated += 1;
         lead = observed.lead;

@@ -104,7 +104,11 @@ export class InMemoryLeadRepository extends LeadRepository {
     this.messagesByLead.get(leadId).push(message);
     if (direction === 'inbound') {
       const job = this.analysisJobs.get(leadId) ?? { leadId, requestedVersion: 0, completedVersion: 0, attemptCount: 0 };
-      this.analysisJobs.set(leadId, { ...job, requestedVersion: job.requestedVersion + 1, status: 'PENDING', nextAttemptAt: new Date(), lockedAt: null });
+      this.analysisJobs.set(leadId, { ...job, requestedVersion: job.requestedVersion + 1,
+        status: job.status === 'PROCESSING' ? 'PROCESSING' : 'PENDING',
+        nextAttemptAt: job.status === 'PROCESSING' ? job.nextAttemptAt : new Date(),
+        lockedAt: job.status === 'PROCESSING' ? job.lockedAt : null,
+        leaseToken: job.status === 'PROCESSING' ? job.leaseToken : null });
     }
     return { ...clone(message), wasInserted: true };
   }
@@ -115,25 +119,29 @@ export class InMemoryLeadRepository extends LeadRepository {
       const stale = job.status === 'PROCESSING' && job.lockedAt && now - new Date(job.lockedAt) >= leaseMs;
       if (stale) { job.status = 'FAILED'; job.nextAttemptAt = now; job.lockedAt = null; }
       if (claimed.length < limit && ['PENDING','FAILED'].includes(job.status) && new Date(job.nextAttemptAt) <= now) {
-        job.status = 'PROCESSING'; job.attemptCount += 1; job.lockedAt = now; claimed.push(clone(job));
+        job.status = 'PROCESSING'; job.attemptCount += 1; job.lockedAt = now; job.leaseToken=randomUUID(); claimed.push(clone(job));
       }
     }
     return claimed;
   }
 
-  async completeAnalysisJob(leadId, version) {
-    const job = this.analysisJobs.get(leadId); if (!job) return false;
-    job.completedVersion = Math.max(job.completedVersion, version); job.lockedAt = null; job.attemptCount = 0;
-    job.status = job.requestedVersion > version ? 'PENDING' : 'PENDING';
-    job.nextAttemptAt = job.requestedVersion > version ? new Date() : new Date(8640000000000000);
+  async failAnalysisJob(claim, { nextAttemptAt, error, maxAttempts = 5 }) {
+    const job = this.analysisJobs.get(claim.leadId); if (!job || job.requestedVersion !== claim.requestedVersion || job.leaseToken!==claim.leaseToken) return false;
+    job.lockedAt = null; job.leaseToken=null; job.lastError = String(error ?? '').slice(0,500);
+    job.status = job.attemptCount >= maxAttempts ? 'EXHAUSTED' : 'FAILED'; job.nextAttemptAt = nextAttemptAt;
     return true;
   }
 
-  async failAnalysisJob(leadId, version, { nextAttemptAt, error, maxAttempts = 5 }) {
-    const job = this.analysisJobs.get(leadId); if (!job || job.requestedVersion !== version) return false;
-    job.lockedAt = null; job.lastError = String(error ?? '').slice(0,500);
-    job.status = job.attemptCount >= maxAttempts ? 'EXHAUSTED' : 'FAILED'; job.nextAttemptAt = nextAttemptAt;
-    return true;
+  async applyAnalysisJobResult(claim, prepared) {
+    const job=this.analysisJobs.get(claim.leadId);
+    if(!job||job.status!=='PROCESSING'||job.leaseToken!==claim.leaseToken) return {applied:false,reason:'lease_lost'};
+    if(job.requestedVersion!==claim.requestedVersion){job.completedVersion=Math.max(job.completedVersion,claim.requestedVersion);job.status='PENDING';job.nextAttemptAt=new Date();job.lockedAt=null;job.leaseToken=null;return {applied:false,reason:'newer_version_pending'};}
+    const result=await this.#applyPrepared(prepared); job.completedVersion=claim.requestedVersion;job.status='PENDING';job.nextAttemptAt=new Date(8640000000000000);job.attemptCount=0;job.lockedAt=null;job.leaseToken=null;return {applied:true,...result};
+  }
+
+  async #applyPrepared(prepared){
+    if(prepared.patch.phoneE164&&prepared.patch.phoneE164!==prepared.lead.phoneE164) await this.recordPhoneHistory({leadId:prepared.leadId,previousPhone:prepared.lead.phoneE164,newPhone:prepared.patch.phoneE164,reason:prepared.lead.phoneE164?'PHONE_UPDATED_FROM_CONVERSATION':'PHONE_CAPTURED'});
+    const lead=await this.updateLead(prepared.leadId,prepared.patch);await this.appendEvent({leadId:prepared.leadId,eventType:'LEAD_PROCESSED',payload:{version:prepared.patch.processingVersion,messageCount:prepared.inboundCount}});return {lead};
   }
 
   async listMessages(leadId) {

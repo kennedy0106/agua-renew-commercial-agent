@@ -17,8 +17,6 @@ jobs:
         options: >-
           --health-cmd "pg_isready -U tester -d agua_renew_test"
           --health-interval 5s --health-timeout 3s --health-retries 20
-    env:
-      TEST_DATABASE_URL: postgres://tester:test_only@localhost:5432/agua_renew_test
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -30,4 +28,6 @@ jobs:
       - run: pnpm --filter @agua-renew/crm test
       - run: pnpm run build:crm
       - run: pnpm run test:postgres
+        env:
+          TEST_DATABASE_URL: postgres://tester:test_only@localhost:5432/agua_renew_test
       - run: pnpm run eval:dry

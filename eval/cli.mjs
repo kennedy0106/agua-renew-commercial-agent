@@ -88,7 +88,7 @@ function regrade(runIdArg) {
   console.log(`   Reportes: ${paths.json} · ${paths.md}`);
 }
 
-function main() {
+async function main() {
   const args = parseArgs(process.argv);
   if (args.regrade) { regrade(args.runId); return; }
   const { version, scenarios } = loadDataset();
@@ -114,12 +114,12 @@ function main() {
       console.log(`\n${modelConfig.label}: dry run (provider scripted, sin API).`);
       const estimate = estimateRunCost(modelConfig, selected.length);
       console.log(`Estimación de costo si fuera real: ${estimate.usage.requests} requests, ${estimate.usage.inputTokens + estimate.usage.outputTokens} tokens ≈ USD ${estimate.estimatedCostUSD}`);
-      runModel(key, modelConfig, selected, { ...args, scripted: true });
+      await runModel(key, modelConfig, selected, { ...args, scripted: true });
       continue;
     }
     const estimate = estimateRunCost(modelConfig, selected.length);
     console.log(`\n${modelConfig.label} (${modelConfig.modelId}): estimación ${estimate.usage.requests} requests, ${estimate.usage.totalTokens ?? estimate.usage.inputTokens + estimate.usage.outputTokens} tokens ≈ USD ${estimate.estimatedCostUSD}`);
-    runModel(key, modelConfig, selected, args);
+    await runModel(key, modelConfig, selected, args);
   }
 
   if (args.compare && Object.keys(resultsByModel).length >= 2) {
@@ -165,12 +165,15 @@ async function runModel(key, modelConfig, scenarios, args) {
     scenarioResults, summary, global, criticalFailures, matrix,
     turnLatencyMs, aiLatencyMs, usage, estimatedCostUSD,
   });
-  saveTranscripts({ runId, scenarioResults });
   const markdown = renderMarkdown(report);
-  const paths = writeReports(report, markdown);
   console.log(`\n✅ ${modelConfig.label} — score global ${global}/100 · ${scenarioResults.length} escenarios · critical failures ${criticalFailures.length}`);
   console.log(`   costo estimado USD ${report.usage.estimatedCostUSD} · turnos p50 ${report.latency.turnMs.p50 ?? '-'}ms · p90 ${report.latency.turnMs.p90 ?? '-'}ms`);
-  console.log(`   Reportes: ${paths.json} · ${paths.md}`);
+  if (args.scripted) console.log('   Dry-run validado; no se sobrescribieron reportes ni transcripciones históricas.');
+  else {
+    saveTranscripts({ runId, scenarioResults });
+    const paths = writeReports(report, markdown);
+    console.log(`   Reportes: ${paths.json} · ${paths.md}`);
+  }
 }
 
 main();

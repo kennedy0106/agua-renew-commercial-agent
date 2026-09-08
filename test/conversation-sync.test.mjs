@@ -4,6 +4,7 @@ import { InMemoryLeadRepository } from '../src/leads/in-memory-lead-repository.m
 import { syncConversations } from '../src/meta/conversation-sync.mjs';
 import { LeadProcessor } from '../src/meta/lead-processor.mjs';
 import { ConversationObserver } from '../src/meta/conversation-observer.mjs';
+import { AnalysisWorker } from '../src/meta/analysis-worker.mjs';
 
 function observerFor(repository) {
   return new ConversationObserver({ repository, processor: new LeadProcessor({ repository }) });
@@ -81,11 +82,13 @@ test('sync: Instagram usa el mismo observer y conserva el canal', async () => {
   globalThis.fetch = async (url) => {
     const u = String(url);
     if (u.includes('/conversations?')) return { json: async () => ({ data: [{ id: 'ig-thread', unread_count: 0, participants: { data: [{ id: 'ig-business' }, { id: 'ig-user', name: 'Cliente IG' }] } }] }) };
-    return { json: async () => ({ data: [{ id: 'ig-mid', message: '625 con mi marca, 955623069', created_time: '2026-08-25T12:00:00+0000', from: { id: 'ig-user' } }] }) };
+    return { json: async () => ({ data: [{ id: 'ig-mid', message: 'Quiero botellas de 625 ml con mi marca, 955623069', created_time: '2026-08-25T12:00:00+0000', from: { id: 'ig-user' } }] }) };
   };
   try {
     const repository = new InMemoryLeadRepository();
-    const summary = await syncConversations({ repository, observer: observerFor(repository), businessAccountId: 'ig-business', platform: 'instagram', pageAccessToken: 'tok', onlyUnread: false });
+    const observer=observerFor(repository);
+    const summary = await syncConversations({ repository, observer, businessAccountId: 'ig-business', platform: 'instagram', pageAccessToken: 'tok', onlyUnread: false });
+    await new AnalysisWorker({repository,processor:observer.processor}).runOnce();
     assert.equal(summary.platform, 'instagram');
     const [lead] = await repository.listLeads({});
     assert.equal(lead.sourceChannel, 'instagram');
